@@ -4,10 +4,11 @@
   "private": true,
   "description": "Outcome Liquidity Exchange V1 modular monolith baseline",
   "license": "UNLICENSED",
+  "packageManager": "npm@11.14.1",
   "scripts": {
-    "build": "nest build",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "start:prod": "node dist/main.js",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "format": "prettier --write \"{src,test}/**/*.ts\"",
@@ -27,27 +28,28 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.4.9",
-    "@nestjs/schematics": "^10.2.3",
     "@nestjs/testing": "^10.4.20",
     "@types/express": "^4.17.21",
-    "@types/jest": "^29.5.14",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.15.21",
     "@types/supertest": "^6.0.3",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
-    "jest": "^29.7.0",
+    "@swc/core": "^1.15.33",
+    "@swc/jest": "^0.2.39",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.4.2",
     "prettier": "^3.5.3",
     "supertest": "^7.1.1",
-    "ts-jest": "^29.3.4",
-    "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "overrides": {
+    "glob": "^13.0.6"
   }
 }

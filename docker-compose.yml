@@ -3,10 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: ${APP_ENV:-development}
     container_name: outcome_exchange_app
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${APP_ENV:-development}
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432

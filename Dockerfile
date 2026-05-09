@@ -1,16 +1,27 @@
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS development
 WORKDIR /usr/src/app
+ENV NODE_ENV=development
+
+RUN corepack enable
 
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
 
 COPY nest-cli.json tsconfig*.json ./
 COPY src ./src
+COPY test ./test
+
+EXPOSE 3000
+CMD ["npm", "run", "start:dev"]
+
+FROM development AS builder
 RUN npm run build
 
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
+
+RUN corepack enable
 
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
