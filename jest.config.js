@@ -4,22 +4,10 @@ const config = {
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': [
-      '@swc/jest',
+    '^.+\\.ts$': [
+      'ts-jest',
       {
-        jsc: {
-          parser: {
-            syntax: 'typescript',
-            decorators: true,
-          },
-          transform: {
-            legacyDecorator: true,
-            decoratorMetadata: true,
-          },
-        },
-        module: {
-          type: 'commonjs',
-        },
+        tsconfig: 'tsconfig.json',
       },
     ],
   },

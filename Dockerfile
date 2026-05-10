@@ -7,7 +7,7 @@ RUN corepack enable
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
 
-COPY nest-cli.json tsconfig*.json ./
+COPY nest-cli.json tsconfig*.json jest.config.js ./
 COPY src ./src
 COPY test ./test
 

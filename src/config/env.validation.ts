@@ -11,4 +11,5 @@ export const envValidationSchema = Joi.object({
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
   JWT_SECRET: Joi.string().min(32).default('dev-only-change-this-secret-1234567890'),
+  JWT_EXPIRES_IN: Joi.string().default('7d'),
 });
