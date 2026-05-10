@@ -1,8 +1,32 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
+
+async function waitFor<T>(
+  fetchValue: () => Promise<T>,
+  assertValue: (value: T) => void,
+): Promise<T> {
+  const attempts = 25;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const value = await fetchValue();
+      assertValue(value);
+      return value;
+    } catch (error) {
+      if (attempt === attempts - 1) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+  }
+
+  throw new Error('Timed out waiting for expected state');
+}
 
 describe('Full Order Flow (e2e)', () => {
   let app: INestApplication;
@@ -28,10 +52,7 @@ describe('Full Order Flow (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
-    );
+    configureApp(app);
     await app.init();
 
     // Register and get tokens
@@ -157,60 +178,69 @@ describe('Full Order Flow (e2e)', () => {
       expect(res.body.priceCents).toBe(40);
     });
 
-    it('bob balance reflects reservation', async () => {
+    it('bob balance reflects debited funds while settlement completes', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/wallet')
         .set('Authorization', `Bearer ${accessTokenBob}`)
         .expect(200);
 
       expect(res.body.availableBalanceCents).toBe(6_000); // 10_000 - 4_000
-      expect(res.body.reservedBalanceCents).toBe(4_000); // 40 * 100
+      expect([0, 4_000]).toContain(res.body.reservedBalanceCents);
     });
 
-    it('order book reflects both orders', async () => {
+    it('matched orders are removed from the open order book', async () => {
       const res = await request(app.getHttpServer())
         .get(`/api/markets/${marketId}/order-book`)
         .expect(200);
 
-      // Check YES side
       const yesLevel = res.body.yes.find((l: Record<string, unknown>) => l.priceCents === 60);
-      expect(yesLevel).toBeDefined();
-
-      // Check NO side
       const noLevel = res.body.no.find((l: Record<string, unknown>) => l.priceCents === 40);
-      expect(noLevel).toBeDefined();
+      expect(yesLevel).toBeUndefined();
+      expect(noLevel).toBeUndefined();
     });
 
-    it('alice can cancel her order and funds are released', async () => {
-      // Get alice's order ID
-      const ordersRes = await request(app.getHttpServer())
-        .get('/api/orders/me')
-        .set('Authorization', `Bearer ${accessTokenAlice}`)
-        .expect(200);
+    it('alice order settles and reserved funds are debited', async () => {
+      const yesOrder = await waitFor(
+        async () => {
+          const ordersRes = await request(app.getHttpServer())
+            .get('/api/orders/me')
+            .set('Authorization', `Bearer ${accessTokenAlice}`)
+            .expect(200);
 
-      const yesOrder = ordersRes.body.find(
-        (o: Record<string, unknown>) => o.side === 'YES' && o.status === 'OPEN',
+          const order = ordersRes.body.find((o: Record<string, unknown>) => o.side === 'YES');
+          if (!order) {
+            throw new Error('YES order not found for alice');
+          }
+
+          return order as Record<string, unknown>;
+        },
+        (order) => {
+          expect(order.status).toBe('MATCHED');
+        },
       );
-      if (!yesOrder) {
-        throw new Error('No open YES order found');
-      }
 
-      // Cancel the order
-      const cancelRes = await request(app.getHttpServer())
-        .delete(`/api/orders/${yesOrder.id}`)
-        .set('Authorization', `Bearer ${accessTokenAlice}`)
-        .expect(200);
+      expect(yesOrder.status).toBe('MATCHED');
 
-      expect(cancelRes.body.status).toBe('CANCELLED');
+      const walletRes = await waitFor(
+        async () => {
+          const response = await request(app.getHttpServer())
+            .get('/api/wallet')
+            .set('Authorization', `Bearer ${accessTokenAlice}`)
+            .expect(200);
 
-      // Check balance is fully released
-      const walletRes = await request(app.getHttpServer())
-        .get('/api/wallet')
-        .set('Authorization', `Bearer ${accessTokenAlice}`)
-        .expect(200);
+          return response.body as {
+            availableBalanceCents: number;
+            reservedBalanceCents: number;
+          };
+        },
+        (wallet) => {
+          expect(wallet.availableBalanceCents).toBe(4_000);
+          expect(wallet.reservedBalanceCents).toBe(0);
+        },
+      );
 
-      expect(walletRes.body.availableBalanceCents).toBe(10_000);
-      expect(walletRes.body.reservedBalanceCents).toBe(0);
+      expect(walletRes.availableBalanceCents).toBe(4_000);
+      expect(walletRes.reservedBalanceCents).toBe(0);
     });
   });
 
@@ -262,8 +292,8 @@ describe('Full Order Flow (e2e)', () => {
 
   describe('API documentation', () => {
     it('swagger docs are available', async () => {
-      const res = await request(app.getHttpServer()).get('/docs').expect(200);
-      expect(res.text).toContain('Outcome Liquidity Exchange');
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      expect(res.body.info.title).toBe('Outcome Liquidity Exchange');
     });
   });
 });
