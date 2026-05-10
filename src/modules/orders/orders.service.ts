@@ -14,6 +14,7 @@ import { MarketStatus } from '../markets/enums/market-status.enum';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { WalletService } from '../wallet/wallet.service';
 import { PlaceOrderDto } from './dto/place-order.dto';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +28,7 @@ export class OrdersService {
     private readonly marketRepository: Repository<Market>,
     private readonly walletService: WalletService,
     private readonly matchingEngineService: MatchingEngineService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async placeOrder(userId: string, dto: PlaceOrderDto): Promise<Order> {
@@ -77,6 +79,13 @@ export class OrdersService {
 
     await this.matchingEngineService.projectOpenOrder(order);
 
+    try {
+      const orderBook = await this.matchingEngineService.getOrderBook(order.marketId);
+      this.realtimeService.broadcastOrderBookUpdate(order.marketId, orderBook);
+    } catch (error) {
+      this.logger.warn(`Failed to broadcast order book update: ${error}`);
+    }
+
     // Matching is best-effort here; order placement remains durable in PostgreSQL.
     try {
       await this.matchingEngineService.tryMatchOrder(order.id);
@@ -118,6 +127,14 @@ export class OrdersService {
     });
 
     await this.matchingEngineService.removeOpenOrder(cancelled);
+
+    try {
+      const orderBook = await this.matchingEngineService.getOrderBook(cancelled.marketId);
+      this.realtimeService.broadcastOrderBookUpdate(cancelled.marketId, orderBook);
+    } catch (error) {
+      this.logger.warn(`Failed to broadcast order book update: ${error}`);
+    }
+
     return cancelled;
   }
 

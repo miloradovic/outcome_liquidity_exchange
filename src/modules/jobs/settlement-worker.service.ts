@@ -9,6 +9,7 @@ import { Trade } from '../markets/entities/trade.entity';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { TradeStatus } from '../markets/enums/trade-status.enum';
 import { WalletService } from '../wallet/wallet.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { SETTLEMENT_QUEUE_NAME } from './settlement-queue.service';
 
 type SettlementJobData = {
@@ -24,6 +25,7 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    private readonly realtimeService: RealtimeService,
     @InjectRepository(Trade)
     private readonly tradeRepository: Repository<Trade>,
     @InjectRepository(Order)
@@ -52,6 +54,8 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
     const { tradeId } = job.data;
 
     try {
+      const settledUserIds: string[] = [];
+
       await this.dataSource.transaction(async (manager) => {
         const tradeRepo = manager.getRepository(Trade);
         const orderRepo = manager.getRepository(Order);
@@ -101,7 +105,24 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
 
         await orderRepo.save([yesOrder, noOrder]);
         await tradeRepo.save(trade);
+
+        settledUserIds.push(yesOrder.userId, noOrder.userId);
       });
+
+      // Emit balance updates for settled users
+      for (const userId of settledUserIds) {
+        try {
+          const wallet = await this.walletService.getWalletByUserId(userId);
+          this.realtimeService.broadcastBalanceUpdate(userId, {
+            availableBalanceCents: wallet.availableBalanceCents,
+            reservedBalanceCents: wallet.reservedBalanceCents,
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to broadcast balance update for user ${userId}: ${error}`,
+          );
+        }
+      }
     } catch (error) {
       await this.markSettlementFailure(tradeId);
       throw error;

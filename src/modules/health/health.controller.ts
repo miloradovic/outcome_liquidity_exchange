@@ -1,11 +1,18 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly configService: ConfigService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Health check endpoint' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service is healthy',
+  })
   getHealth(): Record<string, unknown> {
     return {
       status: 'ok',

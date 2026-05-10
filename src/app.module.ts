@@ -12,6 +12,7 @@ import { MarketsModule } from './modules/markets/markets.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { MatchingEngineModule } from './modules/matching-engine/matching-engine.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+//import { RealtimeModule } from './modules/realtime/realtime.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
     OrdersModule,
     MatchingEngineModule,
     JobsModule,
+    //RealtimeModule,
   ],
 })
 export class AppModule {}

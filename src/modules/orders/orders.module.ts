@@ -5,6 +5,7 @@ import { MatchingEngineModule } from '../matching-engine/matching-engine.module'
 import { Market } from '../markets/entities/market.entity';
 import { Order } from '../markets/entities/order.entity';
 import { WalletModule } from '../wallet/wallet.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -13,6 +14,7 @@ import { OrdersService } from './orders.service';
     TypeOrmModule.forFeature([Order, Market]),
     WalletModule,
     MatchingEngineModule,
+    RealtimeModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
