@@ -69,16 +69,14 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
           return;
         }
 
-        const [yesOrder, noOrder] = await Promise.all([
-          orderRepo.findOne({
-            where: { id: trade.yesOrderId },
-            lock: { mode: 'pessimistic_write' },
-          }),
-          orderRepo.findOne({
-            where: { id: trade.noOrderId },
-            lock: { mode: 'pessimistic_write' },
-          }),
-        ]);
+        const yesOrder = await orderRepo.findOne({
+          where: { id: trade.yesOrderId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const noOrder = await orderRepo.findOne({
+          where: { id: trade.noOrderId },
+          lock: { mode: 'pessimistic_write' },
+        });
 
         if (!yesOrder || !noOrder) {
           throw new Error('Related orders were not found for settlement');

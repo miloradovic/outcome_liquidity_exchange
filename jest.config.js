@@ -3,6 +3,7 @@ const config = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
+  setupFiles: ['<rootDir>/test/setup-env.ts'],
   transform: {
     '^.+\\.ts$': [
       'ts-jest',
