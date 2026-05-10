@@ -1,9 +1,14 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
+import { Market } from '../src/modules/markets/entities/market.entity';
+import { Outcome } from '../src/modules/markets/entities/outcome.entity';
+import { MarketStatus } from '../src/modules/markets/enums/market-status.enum';
+import { OutcomeSide } from '../src/modules/markets/enums/outcome-side.enum';
 
 async function waitFor<T>(
   fetchValue: () => Promise<T>,
@@ -68,11 +73,21 @@ describe('Full Order Flow (e2e)', () => {
       .expect(201);
     accessTokenBob = bobRes.body.accessToken as string;
 
-    // Get first market
-    const marketsRes = await request(app.getHttpServer())
-      .get('/api/markets')
-      .expect(200);
-    marketId = marketsRes.body[0].id;
+    // Create a market for this test suite — do not rely on seed data
+    const dataSource = app.get(DataSource);
+    const market = await dataSource.getRepository(Market).save(
+      dataSource.getRepository(Market).create({
+        slug: `full-flow-${Date.now()}`,
+        title: 'Full Flow E2E Market',
+        status: MarketStatus.OPEN,
+        closesAt: null,
+      }),
+    );
+    marketId = market.id;
+    await dataSource.getRepository(Outcome).save([
+      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.YES }),
+      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.NO }),
+    ]);
   });
 
   afterAll(async () => {
