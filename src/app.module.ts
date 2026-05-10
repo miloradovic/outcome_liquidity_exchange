@@ -8,6 +8,10 @@ import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WalletModule } from './modules/wallet/wallet.module';
+import { MarketsModule } from './modules/markets/markets.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { MatchingEngineModule } from './modules/matching-engine/matching-engine.module';
+import { JobsModule } from './modules/jobs/jobs.module';
 
 @Module({
   imports: [
@@ -24,6 +28,10 @@ import { WalletModule } from './modules/wallet/wallet.module';
     UsersModule,
     AuthModule,
     WalletModule,
+    MarketsModule,
+    OrdersModule,
+    MatchingEngineModule,
+    JobsModule,
   ],
 })
 export class AppModule {}

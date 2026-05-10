@@ -64,6 +64,7 @@ export class WalletService {
     userId: string,
     amountCents: number,
     idempotencyKey: string,
+    manager?: EntityManager,
   ): Promise<Wallet> {
     const mutation = await this.mutateWallet({
       userId,
@@ -75,6 +76,7 @@ export class WalletService {
       apply: (wallet, amount) => {
         wallet.availableBalanceCents += amount;
       },
+      manager,
     });
     return mutation.wallet;
   }
@@ -84,6 +86,7 @@ export class WalletService {
     amountCents: number,
     idempotencyKey: string,
     referenceId: string,
+    manager?: EntityManager,
   ): Promise<Wallet> {
     const mutation = await this.mutateWallet({
       userId,
@@ -99,6 +102,7 @@ export class WalletService {
         wallet.availableBalanceCents -= amount;
         wallet.reservedBalanceCents += amount;
       },
+      manager,
     });
     return mutation.wallet;
   }
@@ -108,6 +112,7 @@ export class WalletService {
     amountCents: number,
     idempotencyKey: string,
     referenceId: string,
+    manager?: EntityManager,
   ): Promise<Wallet> {
     const mutation = await this.mutateWallet({
       userId,
@@ -123,6 +128,7 @@ export class WalletService {
         wallet.reservedBalanceCents -= amount;
         wallet.availableBalanceCents += amount;
       },
+      manager,
     });
     return mutation.wallet;
   }
@@ -132,6 +138,7 @@ export class WalletService {
     amountCents: number,
     idempotencyKey: string,
     referenceId: string,
+    manager?: EntityManager,
   ): Promise<Wallet> {
     const mutation = await this.mutateWallet({
       userId,
@@ -146,6 +153,7 @@ export class WalletService {
         }
         wallet.reservedBalanceCents -= amount;
       },
+      manager,
     });
     return mutation.wallet;
   }
@@ -155,6 +163,7 @@ export class WalletService {
     amountCents: number,
     idempotencyKey: string,
     referenceId: string,
+    manager?: EntityManager,
   ): Promise<Wallet> {
     const mutation = await this.mutateWallet({
       userId,
@@ -166,6 +175,7 @@ export class WalletService {
       apply: (wallet, amount) => {
         wallet.availableBalanceCents += amount;
       },
+      manager,
     });
     return mutation.wallet;
   }
@@ -178,11 +188,12 @@ export class WalletService {
     referenceType: WalletReferenceType;
     referenceId: string;
     apply: (wallet: Wallet, amountCents: number) => void;
+    manager?: EntityManager;
   }): Promise<MutationResult> {
     this.assertPositiveAmount(params.amountCents);
     this.assertIdempotencyKey(params.idempotencyKey);
 
-    return this.dataSource.transaction(async (manager) => {
+    const runMutation = async (manager: EntityManager): Promise<MutationResult> => {
       const walletRepo = manager.getRepository(Wallet);
       const entryRepo = manager.getRepository(WalletEntry);
 
@@ -220,7 +231,13 @@ export class WalletService {
       await entryRepo.save(entry);
 
       return { wallet: savedWallet, idempotentReplay: false };
-    });
+    };
+
+    if (params.manager) {
+      return runMutation(params.manager);
+    }
+
+    return this.dataSource.transaction(async (manager) => runMutation(manager));
   }
 
   private assertPositiveAmount(amountCents: number): void {

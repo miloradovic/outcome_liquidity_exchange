@@ -4,32 +4,28 @@ This repository contains the code for the Outcome Liquidity Exchange (OLX) V1 Ba
 
 ## Prerequisites
 
-- Node.js 22
-- npm 10
-- Docker Desktop
+- Node.js 24
+- npm 11.12
+- Docker
 
-## Local Development
+## V1 API Surface
 
-1. Copy environment defaults:
+Auth:
+- POST /api/auth/register
+- POST /api/auth/login
+- GET /api/me
 
-   ```bash
-   cp .env.example .env
-   ```
+Wallet:
+- GET /api/wallet
+- GET /api/wallet/entries
+- POST /api/wallet/deposit
 
-2. Install dependencies:
+Markets:
+- GET /api/markets
+- GET /api/markets/:marketId
+- GET /api/markets/:marketId/order-book
 
-   ```bash
-   npm install
-   ```
-
-3. Start the app locally:
-
-   ```bash
-   npm run start:dev
-   ```
-
-4. Verify health:
-
-   ```bash
-   curl http://localhost:3000/api/health
-   ```
+Orders:
+- POST /api/orders
+- DELETE /api/orders/:orderId
+- GET /api/orders/me

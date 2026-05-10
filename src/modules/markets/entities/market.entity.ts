@@ -8,6 +8,8 @@ import {
 
 import { MarketStatus } from '../enums/market-status.enum';
 import { Outcome } from './outcome.entity';
+import { Order } from './order.entity';
+import { Trade } from './trade.entity';
 
 @Entity('markets')
 export class Market {
@@ -28,6 +30,12 @@ export class Market {
 
   @OneToMany(() => Outcome, (outcome) => outcome.market, { cascade: true })
   outcomes!: Outcome[];
+
+  @OneToMany(() => Order, (order) => order.market)
+  orders!: Order[];
+
+  @OneToMany(() => Trade, (trade) => trade.market)
+  trades!: Trade[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
