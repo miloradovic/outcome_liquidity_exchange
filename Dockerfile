@@ -1,4 +1,4 @@
-FROM node:24-alpine AS development
+FROM node:24.15.0-alpine3.23 AS development
 WORKDIR /usr/src/app
 ENV NODE_ENV=development
 
@@ -17,7 +17,7 @@ CMD ["npm", "run", "start:dev"]
 FROM development AS builder
 RUN npm run build
 
-FROM node:24-alpine AS production
+FROM node:24.15.0-alpine3.23 AS production
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
