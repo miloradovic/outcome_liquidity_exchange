@@ -13,7 +13,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: exchange
           POSTGRES_PASSWORD: exchange
@@ -27,7 +27,7 @@ jobs:
           --health-retries 10
 
       redis:
-        image: redis:7-alpine
+        image: redis:8-alpine
         ports:
           - 6379:6379
         options: >-
@@ -51,25 +51,31 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: '26'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          cache: true
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Unit tests
-        run: npm test -- --forceExit --passWithNoTests
+        run: pnpm test --forceExit --passWithNoTests
 
       - name: E2E tests
-        run: npm run test:e2e -- --forceExit
+        run: pnpm run test:e2e --forceExit

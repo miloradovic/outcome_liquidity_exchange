@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:17.4-alpine
+    image: postgres:18.3-alpine
     container_name: outcome_exchange_postgres
     environment:
       POSTGRES_USER: ${DB_USER:-exchange}
@@ -35,7 +35,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange} -d ${DB_NAME:-exchange}"]
       interval: 5s
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4.2-alpine
+    image: redis:8.6-alpine
     container_name: outcome_exchange_redis
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
