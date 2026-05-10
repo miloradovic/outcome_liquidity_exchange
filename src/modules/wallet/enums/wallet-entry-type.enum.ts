@@ -1,0 +1,7 @@
+export enum WalletEntryType {
+  DEPOSIT = 'DEPOSIT',
+  RESERVE = 'RESERVE',
+  RELEASE = 'RELEASE',
+  SETTLE_DEBIT = 'SETTLE_DEBIT',
+  SETTLE_CREDIT = 'SETTLE_CREDIT',
+}

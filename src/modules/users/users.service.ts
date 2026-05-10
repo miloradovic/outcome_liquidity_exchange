@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { User } from './entities/user.entity';
 
@@ -23,9 +23,10 @@ export class UsersService {
     email: string;
     passwordHash: string;
     username: string;
-  }): Promise<User> {
-    const user = this.usersRepository.create(data);
-    return this.usersRepository.save(user);
+  }, manager?: EntityManager): Promise<User> {
+    const repo = manager ? manager.getRepository(User) : this.usersRepository;
+    const user = repo.create(data);
+    return repo.save(user);
   }
 
   async existsByEmail(email: string): Promise<boolean> {

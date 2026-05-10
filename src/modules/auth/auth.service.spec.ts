@@ -1,10 +1,12 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
+import { WalletService } from '../wallet/wallet.service';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -25,6 +27,8 @@ const mockUser: User = {
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: jest.Mocked<UsersService>;
+  let walletService: jest.Mocked<WalletService>;
+  let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -40,14 +44,30 @@ describe('AuthService', () => {
           },
         },
         {
+          provide: WalletService,
+          useValue: {
+            createWalletForUser: jest.fn(),
+          },
+        },
+        {
           provide: JwtService,
           useValue: { sign: jest.fn().mockReturnValue('mock-jwt-token') },
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn(async (cb: (manager: unknown) => unknown) =>
+              cb({ getRepository: jest.fn() }),
+            ),
+          },
         },
       ],
     }).compile();
 
     service = module.get(AuthService);
     usersService = module.get(UsersService);
+    walletService = module.get(WalletService);
+    dataSource = module.get(DataSource);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -67,6 +87,12 @@ describe('AuthService', () => {
       expect(result.user.email).toBe('alice@demo.com');
       expect((result.user as Record<string, unknown>)['passwordHash']).toBeUndefined();
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(walletService.createWalletForUser).toHaveBeenCalledWith(
+        mockUser.id,
+        'USD',
+        expect.anything(),
+      );
     });
 
     it('throws ConflictException when email already exists', async () => {

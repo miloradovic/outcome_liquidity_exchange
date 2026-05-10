@@ -13,6 +13,7 @@ import { Market } from '../../modules/markets/entities/market.entity';
 import { Outcome } from '../../modules/markets/entities/outcome.entity';
 import { MarketStatus } from '../../modules/markets/enums/market-status.enum';
 import { OutcomeSide } from '../../modules/markets/enums/outcome-side.enum';
+import { Wallet } from '../../modules/wallet/entities/wallet.entity';
 
 const DEMO_PASSWORD = 'DemoPassword123!';
 const BCRYPT_ROUNDS = 10;
@@ -52,22 +53,35 @@ async function seed(): Promise<void> {
   const userRepo = AppDataSource.getRepository(User);
   const marketRepo = AppDataSource.getRepository(Market);
   const outcomeRepo = AppDataSource.getRepository(Outcome);
+  const walletRepo = AppDataSource.getRepository(Wallet);
 
   // Seed demo users
   console.log('\n--- Seeding demo users ---');
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
   for (const demo of DEMO_USERS) {
-    const existing = await userRepo.findOne({ where: { email: demo.email } });
-    if (existing) {
+    let user = await userRepo.findOne({ where: { email: demo.email } });
+    if (!user) {
+      user = await userRepo.save(
+        userRepo.create({ email: demo.email, username: demo.username, passwordHash }),
+      );
+      console.log(`  CREATED  ${demo.email}`);
+    } else {
       console.log(`  SKIP  ${demo.email} (already exists)`);
-      continue;
     }
 
-    await userRepo.save(
-      userRepo.create({ email: demo.email, username: demo.username, passwordHash }),
-    );
-    console.log(`  CREATED  ${demo.email}`);
+    const wallet = await walletRepo.findOne({ where: { userId: user.id } });
+    if (!wallet) {
+      await walletRepo.save(
+        walletRepo.create({
+          userId: user.id,
+          currencyCode: 'USD',
+          availableBalanceCents: 0,
+          reservedBalanceCents: 0,
+        }),
+      );
+      console.log(`  CREATED  wallet for ${demo.email}`);
+    }
   }
 
   // Seed demo markets

@@ -17,7 +17,7 @@ CMD ["npm", "run", "start:dev"]
 FROM development AS builder
 RUN npm run build
 
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
