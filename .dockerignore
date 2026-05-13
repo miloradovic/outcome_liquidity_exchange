@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+.next
+apps/web/.next
 .git
 .gitignore
 .vscode

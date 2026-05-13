@@ -20,10 +20,6 @@ import { JwtService } from '@nestjs/jwt';
 @Injectable()
 @WebSocketGateway({
   namespace: '/balance',
-  cors: {
-    origin: '*',
-    credentials: false,
-  },
 })
 export class BalanceGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

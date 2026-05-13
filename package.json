@@ -10,6 +10,8 @@
     "start": "node dist/main.js",
     "start:dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "start:prod": "node dist/main.js",
+    "web:dev": "pnpm --filter ./apps/web dev",
+    "web:build": "pnpm --filter ./apps/web build",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "format": "prettier --write \"{src,test}/**/*.ts\"",
     "test": "jest",

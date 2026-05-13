@@ -11,10 +11,6 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   namespace: '/order-book',
-  cors: {
-    origin: '*',
-    credentials: false,
-  },
 })
 export class OrderBookGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

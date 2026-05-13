@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+apps/web/.next/
 
 # Logs
 npm-debug.log*

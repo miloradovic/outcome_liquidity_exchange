@@ -15,6 +15,7 @@ import { Trade } from '../markets/entities/trade.entity';
 import { OutcomeSide } from '../markets/enums/outcome-side.enum';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { TradeStatus } from '../markets/enums/trade-status.enum';
+import { RealtimeService } from '../realtime/realtime.service';
 
 export type OrderBookLevel = {
   priceCents: number;
@@ -36,6 +37,7 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly settlementQueueService: SettlementQueueService,
+    private readonly realtimeService: RealtimeService,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(Trade)
@@ -153,7 +155,7 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
       const savedTrade = await tradeRepo.save(trade);
 
       return {
-        tradeId: savedTrade.id,
+        trade: savedTrade,
         order,
         counterparty,
       };
@@ -169,16 +171,26 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
     ]);
 
     try {
-      await this.settlementQueueService.addSettlementJob(matched.tradeId);
+      this.realtimeService.broadcastTradeCreated(matched.trade.marketId, matched.trade);
+
+      const orderBook = await this.getOrderBook(matched.trade.marketId);
+      this.realtimeService.broadcastOrderBookUpdate(matched.trade.marketId, orderBook);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.error(`Failed to enqueue settlement for trade ${matched.tradeId}: ${message}`);
+      this.logger.warn(`Failed to broadcast trade/order book updates: ${message}`);
+    }
+
+    try {
+      await this.settlementQueueService.addSettlementJob(matched.trade.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.error(`Failed to enqueue settlement for trade ${matched.trade.id}: ${message}`);
 
       await this.dataSource.transaction(async (manager) => {
         const tradeRepo = manager.getRepository(Trade);
         const orderRepo = manager.getRepository(Order);
 
-        await tradeRepo.update({ id: matched.tradeId }, { status: TradeStatus.FAILED });
+        await tradeRepo.update({ id: matched.trade.id }, { status: TradeStatus.FAILED });
         await orderRepo.update(
           { id: matched.order.id },
           { status: OrderStatus.SETTLEMENT_FAILED },

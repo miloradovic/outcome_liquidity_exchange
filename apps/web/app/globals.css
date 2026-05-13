@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(91, 192, 190, 0.15), transparent 35%),
+    radial-gradient(circle at 90% 90%, rgba(28, 37, 65, 0.12), transparent 30%),
+    #f8f7f4;
+  color: #0b132b;
+}
+
+a {
+  color: inherit;
+}

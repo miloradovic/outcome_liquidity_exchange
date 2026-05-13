@@ -4,12 +4,15 @@ import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
+import { RealtimeIoAdapter } from './modules/realtime/realtime-io.adapter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  const appConfig = app.get(ConfigService);
+
+  app.useWebSocketAdapter(new RealtimeIoAdapter(app, appConfig));
   configureApp(app);
 
-  const appConfig = app.get(ConfigService);
   const port = appConfig.get<number>('PORT', 3000);
 
   await app.listen(port);

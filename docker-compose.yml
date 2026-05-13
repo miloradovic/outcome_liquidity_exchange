@@ -3,10 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: ${APP_ENV:-development}
+      target: development
     container_name: outcome_exchange_app
     environment:
-      NODE_ENV: ${APP_ENV:-development}
+      NODE_ENV: development
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
@@ -16,13 +16,55 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-this-secret-1234567890}
+      HTTP_ALLOWED_ORIGINS: ${HTTP_ALLOWED_ORIGINS:-http://localhost:3001}
+      WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-http://localhost:3001}
     ports:
       - "3000:3000"
+    command: >
+      sh -lc "
+      if [ ! -d node_modules/.pnpm ]; then pnpm install --frozen-lockfile --filter .; fi;
+      pnpm run start:dev
+      "
+    volumes:
+      - .:/usr/src/app
+      - app_node_modules:/usr/src/app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-development
+    container_name: outcome_exchange_web
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
+      NEXT_PUBLIC_WS_BASE_URL: ${NEXT_PUBLIC_WS_BASE_URL:-http://localhost:3000}
+    ports:
+      - "3001:3000"
+    command: >
+      sh -lc "
+      pnpm --dir /usr/src/app install --frozen-lockfile --filter ./apps/web...;
+      pnpm run dev --hostname 0.0.0.0 --port 3000
+      "
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - .:/usr/src/app
+      - web_root_node_modules:/usr/src/app/node_modules
+      - web_app_node_modules:/usr/src/app/apps/web/node_modules
+      - web_next_cache:/usr/src/app/apps/web/.next
     restart: unless-stopped
 
   postgres:
@@ -61,3 +103,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  app_node_modules:
+  web_root_node_modules:
+  web_app_node_modules:
+  web_next_cache:

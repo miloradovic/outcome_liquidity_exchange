@@ -1,8 +1,21 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { parseAllowedOrigins } from './config/origins.util';
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
+
+  const configService = app.get(ConfigService);
+  const httpAllowedOrigins = parseAllowedOrigins(
+    configService.get<string>('HTTP_ALLOWED_ORIGINS'),
+  );
+
+  app.enableCors({
+    origin: httpAllowedOrigins,
+    credentials: false,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
