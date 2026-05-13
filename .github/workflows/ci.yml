@@ -48,6 +48,10 @@ jobs:
       REDIS_PORT: 6379
       JWT_SECRET: ci-test-jwt-secret-that-is-long-enough-1234567890
       JWT_EXPIRES_IN: 1h
+      HTTP_ALLOWED_ORIGINS: http://localhost:3001
+      WS_ALLOWED_ORIGINS: http://localhost:3001
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
+      NEXT_PUBLIC_WS_BASE_URL: http://localhost:3000
 
     steps:
       - name: Checkout
@@ -70,8 +74,14 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      - name: Web lint
+        run: pnpm run web:lint
+
       - name: Build
         run: pnpm run build
+
+      - name: Web build
+        run: pnpm run web:build
 
       - name: Unit tests
         run: pnpm test --forceExit --passWithNoTests

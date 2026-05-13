@@ -22,7 +22,7 @@ services:
       - "3000:3000"
     command: >
       sh -lc "
-      if [ ! -d node_modules/.pnpm ]; then pnpm install --frozen-lockfile --filter .; fi;
+      pnpm install --frozen-lockfile --filter .;
       pnpm run start:dev
       "
     volumes:

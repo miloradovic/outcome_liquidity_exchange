@@ -1,22 +1,42 @@
 # Outcome Liquidity Exchange (V1 Baseline)
 
-A NestJS modular monolith for trading binary outcome tokens with exact-price exact-quantity matching. Built in 4 weeks with PostgreSQL as canonical state, Redis as projection layer, and WebSocket for realtime updates.
+A NestJS modular monolith for trading binary outcome tokens with exact-price exact-quantity matching. Built with PostgreSQL as canonical state, Redis as projection layer, and WebSocket for realtime updates.
 
 ## Quick Start (Docker)
 
 ```bash
-# Start all services (app, PostgreSQL, Redis)
-docker compose up --build
+# 1) Create env file (first run only)
+cp .env.example .env
 
-# Run migrations
-docker compose exec app npm run migration:run
+# 2) Start API, web, PostgreSQL, and Redis
+docker compose up --build -d
 
-# Run seeds (populate demo users and markets)
-docker compose exec app npm run seed
+# 3) Run migrations
+docker compose exec app pnpm run migration:run
 
-# View Swagger API docs
-open http://localhost:3000/docs
+# 4) Seed demo users and markets
+docker compose exec app pnpm run seed
 ```
+
+Open in browser:
+- Web UI: http://localhost:3001
+- API docs: http://localhost:3000/docs
+- API health: http://localhost:3000/api/health
+
+Stop everything:
+
+```bash
+docker compose down
+```
+
+## Week 5 Demo Flow
+
+1. Register or login from the web app.
+2. Open Wallet and deposit demo funds.
+3. Browse Markets and open a market detail page.
+4. Place an order from the order ticket.
+5. Open a second browser session, place the complementary order, and watch live order-book and balance updates.
+6. Cancel an unmatched open order from My Orders.
 
 ## Architecture Overview
 
@@ -32,12 +52,13 @@ open http://localhost:3000/docs
 ### Technology Stack
 
 - **Framework**: NestJS with TypeScript
-- **Database**: PostgreSQL 16 (canonical state)
-- **Cache**: Redis 7 (projections)
+- **Database**: PostgreSQL 18 (canonical state)
+- **Cache**: Redis 8 (projections)
 - **Realtime**: Socket.io for WebSocket broadcasts
 - **Documentation**: Swagger/OpenAPI
 - **Testing**: Jest + Supertest + BullMQ testing utilities
 - **Task Queue**: BullMQ for settlement and expiry jobs
+- **Web UI**: Next.js App Router + TanStack Query + React Hook Form + Zod + Tailwind CSS
 
 ### Module Architecture
 
@@ -186,6 +207,17 @@ npm run test:e2e
 ```
 Tests full flows: register → deposit → place → match → settle
 
+### Web Build
+```bash
+pnpm run web:build
+```
+
+### Web Lint and Typecheck
+```bash
+pnpm run web:lint
+pnpm run web:test
+```
+
 Key scenarios covered:
 - Register and deposit flow
 - Place order, view order book
@@ -196,14 +228,22 @@ Key scenarios covered:
 
 ### Local Verification
 ```bash
-# Full test suite
-npm run lint && npm run build && npm test && npm run test:e2e
+# API checks (inside app container)
+docker compose exec app pnpm run lint
+docker compose exec app pnpm run build
+docker compose exec app pnpm run test
+docker compose exec app pnpm run test:e2e
 
-# Or via Docker
-docker compose run --rm app npm run lint
-docker compose run --rm app npm run build
-docker compose run --rm app npm run test
-docker compose run --rm app npm run test:e2e
+# Web checks (inside web container)
+docker compose exec web pnpm run lint
+docker compose exec web pnpm run test
+docker compose exec web sh -lc "NODE_ENV=production pnpm run build"
+```
+
+Optional non-Docker shortcut (requires local dependencies):
+
+```bash
+pnpm run validate
 ```
 
 ## V1 Scope (Intentional Boundaries)

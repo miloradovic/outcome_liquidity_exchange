@@ -30,6 +30,8 @@ function WalletContent(): ReactElement {
   const { token, user } = useAuth();
   const [depositError, setDepositError] = useState<string | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [lastRealtimeAt, setLastRealtimeAt] = useState<number | null>(null);
 
   const walletQuery = useQuery({
@@ -53,15 +55,26 @@ function WalletContent(): ReactElement {
 
     const authenticate = () => {
       setIsRealtimeConnected(true);
+      setReconnectAttempt(0);
+      setRealtimeError(null);
       socket.emit('authenticate', { token }, (response?: { status?: string }) => {
         if (response?.status && response.status !== 'authenticated') {
           setIsRealtimeConnected(false);
+          setRealtimeError('Balance socket authentication failed');
         }
       });
     };
 
     const handleDisconnect = () => {
       setIsRealtimeConnected(false);
+    };
+
+    const handleConnectError = (error: Error) => {
+      setRealtimeError(error.message || 'Realtime connection failed');
+    };
+
+    const handleReconnectAttempt = (attempt: number) => {
+      setReconnectAttempt(attempt);
     };
 
     const handleBalanceUpdate = (message: BalanceUpdateMessage) => {
@@ -85,6 +98,8 @@ function WalletContent(): ReactElement {
 
     socket.on('connect', authenticate);
     socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+    socket.io.on('reconnect_attempt', handleReconnectAttempt);
     socket.on('balance-update', handleBalanceUpdate);
 
     socket.connect();
@@ -95,6 +110,8 @@ function WalletContent(): ReactElement {
     return () => {
       socket.off('connect', authenticate);
       socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
+      socket.io.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('balance-update', handleBalanceUpdate);
       socket.disconnect();
     };
@@ -152,13 +169,32 @@ function WalletContent(): ReactElement {
     return wallet.availableBalanceCents + wallet.reservedBalanceCents;
   }, [walletQuery.data]);
 
+  const realtimeStatus = isRealtimeConnected
+    ? 'connected'
+    : reconnectAttempt > 0
+      ? `reconnecting (${reconnectAttempt})`
+      : 'offline';
+
   return (
     <main className="mx-auto min-h-[calc(100vh-60px)] w-full max-w-6xl px-6 py-10">
       <h1 className="text-3xl font-black text-ink">Wallet</h1>
       <p className="mt-1 text-sm text-tide">
-        Private balance stream: {isRealtimeConnected ? 'connected' : 'offline'}
+        Private balance stream: {realtimeStatus}
         {lastRealtimeAt ? ` - updated ${new Date(lastRealtimeAt).toLocaleTimeString()}` : ''}
       </p>
+      {realtimeError ? (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Realtime notice: {realtimeError}
+        </p>
+      ) : null}
+
+      {walletQuery.isLoading ? <p className="mt-4 text-sm text-tide">Loading wallet balances...</p> : null}
+
+      {walletQuery.isError ? (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Unable to load wallet balances.
+        </p>
+      ) : null}
 
       <section className="mt-6 grid gap-4 md:grid-cols-3">
         <article className="rounded-xl border border-ink/10 bg-white p-4 shadow-sm">
@@ -218,6 +254,12 @@ function WalletContent(): ReactElement {
         <div className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-bold text-ink">Latest Wallet Entries</h2>
           {entriesQuery.isLoading ? <p className="mt-4 text-sm text-tide">Loading entries...</p> : null}
+
+          {entriesQuery.isError ? (
+            <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              Unable to load wallet entries.
+            </p>
+          ) : null}
 
           {!entriesQuery.isLoading && entriesQuery.data && entriesQuery.data.length === 0 ? (
             <p className="mt-4 text-sm text-tide">No wallet entries yet.</p>

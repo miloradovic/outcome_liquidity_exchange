@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run typecheck",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "pnpm run typecheck"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
