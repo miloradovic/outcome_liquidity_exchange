@@ -1,5 +1,6 @@
 services:
   app:
+    image: olx-app-dev:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -41,6 +42,7 @@ services:
     restart: unless-stopped
 
   web:
+    image: olx-web-dev:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -104,6 +106,10 @@ volumes:
   postgres_data:
   redis_data:
   app_node_modules:
+    name: olx_app_node_modules
   web_root_node_modules:
+    name: olx_web_root_node_modules
   web_app_node_modules:
+    name: olx_web_app_node_modules
   web_next_cache:
+    name: olx_web_next_cache

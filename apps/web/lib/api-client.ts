@@ -18,6 +18,8 @@ type RequestOptions = {
   body?: unknown;
 };
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 type RegisterPayload = {
   email: string;
   password: string;
@@ -76,12 +78,29 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
     headers.set('Authorization', `Bearer ${options.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    cache: 'no-store',
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('Request timed out. Please try again.', 408);
+    }
+
+    throw new ApiError('Network request failed', 0);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let payload: ApiErrorPayload | undefined;

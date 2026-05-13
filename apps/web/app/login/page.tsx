@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -18,8 +18,18 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+function resolveRedirectTarget(redirect: string | null): string {
+  if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
+    return '/wallet';
+  }
+
+  return redirect;
+}
+
 export default function LoginPage(): ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = resolveRedirectTarget(searchParams.get('redirect'));
   const { login, isAuthenticating, isHydrated, isAuthenticated } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -37,16 +47,16 @@ export default function LoginPage(): ReactElement {
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
-      router.replace('/wallet');
+      router.replace(redirectTarget);
     }
-  }, [isHydrated, isAuthenticated, router]);
+  }, [isHydrated, isAuthenticated, redirectTarget, router]);
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
 
     try {
       await login(values);
-      router.push('/wallet');
+      router.push(redirectTarget);
     } catch (error: unknown) {
       if (error instanceof ApiError) {
         setFormError(error.message);

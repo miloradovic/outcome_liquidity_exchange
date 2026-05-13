@@ -14,6 +14,21 @@ import { apiClient } from '@/lib/api-client';
 import type { UserProfile } from '@/lib/types';
 
 const ACCESS_TOKEN_KEY = 'olx.access-token';
+const AUTH_SESSION_COOKIE_KEY = 'olx.authenticated';
+const AUTH_SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
+function persistAuthSessionCookie(isAuthenticated: boolean): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  if (isAuthenticated) {
+    document.cookie = `${AUTH_SESSION_COOKIE_KEY}=1; Max-Age=${AUTH_SESSION_COOKIE_MAX_AGE_SECONDS}; Path=/; SameSite=Lax`;
+    return;
+  }
+
+  document.cookie = `${AUTH_SESSION_COOKIE_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
 
 type LoginPayload = {
   email: string;
@@ -59,10 +74,12 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
 
     if (nextToken) {
       window.localStorage.setItem(ACCESS_TOKEN_KEY, nextToken);
+      persistAuthSessionCookie(true);
       return;
     }
 
     window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    persistAuthSessionCookie(false);
   }, []);
 
   const hydrate = useCallback(async () => {
