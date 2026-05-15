@@ -19,6 +19,7 @@ export const envValidationSchema = Joi.object({
   DB_SSL_REJECT_UNAUTHORIZED: Joi.boolean().default(true),
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
+  REDIS_KEY_PREFIX: Joi.string().trim().min(1).default('olx'),
   AUTH_USER_CACHE_TTL_SECONDS: Joi.number().integer().min(1).default(15),
   JWT_SECRET: Joi.when('NODE_ENV', {
     is: 'production',

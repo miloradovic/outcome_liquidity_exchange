@@ -1,10 +1,7 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
@@ -12,6 +9,8 @@ import { Repository } from 'typeorm';
 import { Order } from '../markets/entities/order.entity';
 import { OutcomeSide } from '../markets/enums/outcome-side.enum';
 import { OrderStatus } from '../markets/enums/order-status.enum';
+import { RedisClientService } from '../redis/redis-client.service';
+import { RedisKeyspaceService } from '../redis/redis-keyspace.service';
 
 export type OrderBookLevel = {
   priceCents: number;
@@ -25,28 +24,17 @@ export type OrderBookView = {
 };
 
 @Injectable()
-export class OrderBookProjectionService implements OnModuleInit, OnModuleDestroy {
+export class OrderBookProjectionService {
   private readonly logger = new Logger(OrderBookProjectionService.name);
-  private redis!: Redis;
+  private readonly redis: Redis;
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly redisClientService: RedisClientService,
+    private readonly redisKeyspaceService: RedisKeyspaceService,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
-  ) {}
-
-  async onModuleInit(): Promise<void> {
-    this.redis = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      maxRetriesPerRequest: null,
-    });
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    if (this.redis) {
-      await this.redis.quit();
-    }
+  ) {
+    this.redis = this.redisClientService.getClient();
   }
 
   async projectOpenOrder(order: Order): Promise<void> {
@@ -152,7 +140,7 @@ export class OrderBookProjectionService implements OnModuleInit, OnModuleDestroy
       const [nextCursor, keys] = await this.redis.scan(
         cursor,
         'MATCH',
-        'orderbook:*',
+        this.redisKeyspaceService.getOrderBookScanPattern(),
         'COUNT',
         '100',
       );
@@ -165,10 +153,10 @@ export class OrderBookProjectionService implements OnModuleInit, OnModuleDestroy
   }
 
   private sideKey(marketId: string, side: OutcomeSide): string {
-    return `orderbook:${marketId}:${side}`;
+    return this.redisKeyspaceService.getOrderBookSideKey(marketId, side);
   }
 
   private orderHashKey(orderId: string): string {
-    return `orderbook:order:${orderId}`;
+    return this.redisKeyspaceService.getOrderHashKey(orderId);
   }
 }

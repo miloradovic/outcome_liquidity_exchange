@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Worker } from 'bullmq';
 import { DataSource, Repository } from 'typeorm';
@@ -8,6 +7,8 @@ import { Order } from '../markets/entities/order.entity';
 import { Trade } from '../markets/entities/trade.entity';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { TradeStatus } from '../markets/enums/trade-status.enum';
+import { RedisClientService } from '../redis/redis-client.service';
+import { RedisKeyspaceService } from '../redis/redis-keyspace.service';
 import { WalletService } from '../wallet/wallet.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { SETTLEMENT_QUEUE_NAME } from './settlement-queue.service';
@@ -22,7 +23,8 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
   private worker!: Worker<SettlementJobData>;
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly redisClientService: RedisClientService,
+    private readonly redisKeyspaceService: RedisKeyspaceService,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
     private readonly realtimeService: RealtimeService,
@@ -37,10 +39,8 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
       SETTLEMENT_QUEUE_NAME,
       async (job) => this.handleSettlement(job),
       {
-        connection: {
-          host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-          port: this.configService.get<number>('REDIS_PORT', 6379),
-        },
+        connection: this.redisClientService.getClient(),
+        prefix: this.redisKeyspaceService.getBullPrefix(),
       },
     );
 

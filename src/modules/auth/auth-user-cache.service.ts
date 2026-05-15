@@ -1,12 +1,11 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
 
+import { RedisClientService } from '../redis/redis-client.service';
+import { RedisKeyspaceService } from '../redis/redis-keyspace.service';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 
@@ -19,33 +18,20 @@ type CachedAuthUser = {
 };
 
 @Injectable()
-export class AuthUserCacheService implements OnModuleInit, OnModuleDestroy {
+export class AuthUserCacheService {
   private readonly logger = new Logger(AuthUserCacheService.name);
   private readonly ttlSeconds: number;
-  private redis!: Redis;
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly redisClientService: RedisClientService,
+    private readonly redisKeyspaceService: RedisKeyspaceService,
     private readonly usersService: UsersService,
   ) {
     this.ttlSeconds = this.configService.get<number>(
       'AUTH_USER_CACHE_TTL_SECONDS',
       15,
     );
-  }
-
-  async onModuleInit(): Promise<void> {
-    this.redis = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      maxRetriesPerRequest: null,
-    });
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    if (this.redis) {
-      await this.redis.quit();
-    }
   }
 
   async getUserById(userId: string): Promise<User | null> {
@@ -66,7 +52,7 @@ export class AuthUserCacheService implements OnModuleInit, OnModuleDestroy {
 
   private async readFromCache(cacheKey: string): Promise<User | null> {
     try {
-      const rawValue = await this.redis.get(cacheKey);
+      const rawValue = await this.redisClientService.getClient().get(cacheKey);
       if (!rawValue) {
         return null;
       }
@@ -100,7 +86,7 @@ export class AuthUserCacheService implements OnModuleInit, OnModuleDestroy {
     };
 
     try {
-      await this.redis.set(
+      await this.redisClientService.getClient().set(
         cacheKey,
         JSON.stringify(value),
         'EX',
@@ -124,6 +110,6 @@ export class AuthUserCacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   private cacheKey(userId: string): string {
-    return `auth:user:${userId}`;
+    return this.redisKeyspaceService.getAuthUserCacheKey(userId);
   }
 }

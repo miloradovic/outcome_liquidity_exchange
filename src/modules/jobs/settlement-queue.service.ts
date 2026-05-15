@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JobsOptions, Queue } from 'bullmq';
+
+import { RedisClientService } from '../redis/redis-client.service';
+import { RedisKeyspaceService } from '../redis/redis-keyspace.service';
 
 export const SETTLEMENT_QUEUE_NAME = 'settlement';
 
@@ -12,14 +14,15 @@ type SettlementJobData = {
 export class SettlementQueueService implements OnModuleInit, OnModuleDestroy {
   private queue!: Queue<SettlementJobData>;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly redisClientService: RedisClientService,
+    private readonly redisKeyspaceService: RedisKeyspaceService,
+  ) {}
 
   onModuleInit(): void {
     this.queue = new Queue<SettlementJobData>(SETTLEMENT_QUEUE_NAME, {
-      connection: {
-        host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-        port: this.configService.get<number>('REDIS_PORT', 6379),
-      },
+      connection: this.redisClientService.getClient(),
+      prefix: this.redisKeyspaceService.getBullPrefix(),
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: 100,
