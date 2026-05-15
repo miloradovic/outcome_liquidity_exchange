@@ -8,14 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
+import { MatchingEngineBroadcastService } from '../matching-engine/matching-engine-broadcast.service';
 import { MatchingEngineService } from '../matching-engine/matching-engine.service';
-import { Market } from '../markets/entities/market.entity';
+import { OrderBookProjectionService } from '../matching-engine/order-book-projection.service';
+import { MarketAccessService } from '../markets/market-access.service';
 import { Order } from '../markets/entities/order.entity';
-import { MarketStatus } from '../markets/enums/market-status.enum';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { WalletService } from '../wallet/wallet.service';
 import { PlaceOrderDto } from './dto/place-order.dto';
-import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class OrdersService {
@@ -25,9 +25,11 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    private readonly marketAccessService: MarketAccessService,
     private readonly walletService: WalletService,
     private readonly matchingEngineService: MatchingEngineService,
-    private readonly realtimeService: RealtimeService,
+    private readonly orderBookProjectionService: OrderBookProjectionService,
+    private readonly matchingEngineBroadcastService: MatchingEngineBroadcastService,
   ) {}
 
   async placeOrder(userId: string, dto: PlaceOrderDto): Promise<Order> {
@@ -38,7 +40,6 @@ export class OrdersService {
 
     const order = await this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
-      const marketRepo = manager.getRepository(Market);
 
       const existing = await orderRepo.findOne({
         where: { userId, idempotencyKey: dto.idempotencyKey },
@@ -47,16 +48,10 @@ export class OrdersService {
         return existing;
       }
 
-      const market = await marketRepo.findOne({
-        where: { id: dto.marketId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!market) {
-        throw new NotFoundException('Market not found');
-      }
-      if (market.status !== MarketStatus.OPEN) {
-        throw new BadRequestException('Market is not open');
-      }
+      await this.marketAccessService.getOpenMarketForOrderPlacement(
+        dto.marketId,
+        manager,
+      );
 
       const created = orderRepo.create({
         userId,
@@ -81,11 +76,10 @@ export class OrdersService {
       return saved;
     });
 
-    await this.matchingEngineService.projectOpenOrder(order);
+    await this.orderBookProjectionService.projectOpenOrder(order);
 
     try {
-      const orderBook = await this.matchingEngineService.getOrderBook(order.marketId);
-      this.realtimeService.broadcastOrderBookUpdate(order.marketId, orderBook);
+      await this.matchingEngineBroadcastService.broadcastOrderBookUpdate(order.marketId);
     } catch (error) {
       this.logger.warn(`Failed to broadcast order book update: ${error}`);
     }
@@ -130,11 +124,10 @@ export class OrdersService {
       return order;
     });
 
-    await this.matchingEngineService.removeOpenOrder(cancelled);
+    await this.orderBookProjectionService.removeOpenOrder(cancelled);
 
     try {
-      const orderBook = await this.matchingEngineService.getOrderBook(cancelled.marketId);
-      this.realtimeService.broadcastOrderBookUpdate(cancelled.marketId, orderBook);
+      await this.matchingEngineBroadcastService.broadcastOrderBookUpdate(cancelled.marketId);
     } catch (error) {
       this.logger.warn(`Failed to broadcast order book update: ${error}`);
     }

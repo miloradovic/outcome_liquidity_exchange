@@ -6,7 +6,9 @@ import { Order } from '../markets/entities/order.entity';
 import { Trade } from '../markets/entities/trade.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { WalletModule } from '../wallet/wallet.module';
+import { MatchingEngineBroadcastService } from './matching-engine-broadcast.service';
 import { MatchingEngineService } from './matching-engine.service';
+import { OrderBookProjectionService } from './order-book-projection.service';
 
 @Module({
   imports: [
@@ -15,7 +17,15 @@ import { MatchingEngineService } from './matching-engine.service';
     RealtimeModule,
     WalletModule,
   ],
-  providers: [MatchingEngineService],
-  exports: [MatchingEngineService],
+  providers: [
+    MatchingEngineService,
+    OrderBookProjectionService,
+    MatchingEngineBroadcastService,
+  ],
+  exports: [
+    MatchingEngineService,
+    OrderBookProjectionService,
+    MatchingEngineBroadcastService,
+  ],
 })
 export class MatchingEngineModule {}

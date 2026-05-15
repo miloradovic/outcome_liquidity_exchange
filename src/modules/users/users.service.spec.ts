@@ -17,14 +17,26 @@ const mockUser: User = {
 describe('UsersService', () => {
   let service: UsersService;
   let repo: jest.Mocked<Repository<User>>;
+  let queryBuilder: {
+    addSelect: jest.Mock;
+    where: jest.Mock;
+    getOne: jest.Mock;
+  };
 
   beforeEach(async () => {
+    queryBuilder = {
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         UsersService,
         {
           provide: getRepositoryToken(User),
           useValue: {
+            createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
             findOne: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
@@ -40,16 +52,30 @@ describe('UsersService', () => {
 
   describe('findByEmail', () => {
     it('returns user when found', async () => {
-      repo.findOne.mockResolvedValue(mockUser);
+      queryBuilder.getOne.mockResolvedValue(mockUser);
       const result = await service.findByEmail('alice@demo.com');
+
       expect(result).toEqual(mockUser);
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { email: 'alice@demo.com' },
+      expect(repo.createQueryBuilder).toHaveBeenCalledWith('user');
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith('user.passwordHash');
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'user.email = :email',
+        { email: 'alice@demo.com' },
+      );
+    });
+
+    it('normalizes email before query', async () => {
+      queryBuilder.getOne.mockResolvedValue(mockUser);
+
+      await service.findByEmail('  ALICE@DEMO.COM  ');
+
+      expect(queryBuilder.where).toHaveBeenCalledWith('user.email = :email', {
+        email: 'alice@demo.com',
       });
     });
 
     it('returns null when not found', async () => {
-      repo.findOne.mockResolvedValue(null);
+      queryBuilder.getOne.mockResolvedValue(null);
       const result = await service.findByEmail('notfound@demo.com');
       expect(result).toBeNull();
     });

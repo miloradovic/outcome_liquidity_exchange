@@ -8,8 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 
 import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
-import { MatchingEngineService, OrderBookView } from '../matching-engine/matching-engine.service';
 import { WalletService } from '../wallet/wallet.service';
+import { MarketAccessService } from './market-access.service';
 import { Market } from './entities/market.entity';
 import { Outcome } from './entities/outcome.entity';
 import { Order } from './entities/order.entity';
@@ -23,9 +23,9 @@ export class MarketsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    private readonly marketAccessService: MarketAccessService,
     @InjectRepository(Market)
     private readonly marketRepository: Repository<Market>,
-    private readonly matchingEngineService: MatchingEngineService,
   ) {}
 
   async getMarkets(
@@ -41,21 +41,7 @@ export class MarketsService {
   }
 
   async getMarketById(marketId: string): Promise<Market> {
-    const market = await this.marketRepository.findOne({
-      where: { id: marketId },
-      relations: { outcomes: true },
-    });
-
-    if (!market) {
-      throw new NotFoundException('Market not found');
-    }
-
-    return market;
-  }
-
-  async getOrderBook(marketId: string): Promise<OrderBookView> {
-    await this.getMarketById(marketId);
-    return this.matchingEngineService.getOrderBook(marketId);
+    return this.marketAccessService.getMarketByIdOrFail(marketId);
   }
 
   async resolveMarket(marketId: string, winningSide: OutcomeSide): Promise<Market> {

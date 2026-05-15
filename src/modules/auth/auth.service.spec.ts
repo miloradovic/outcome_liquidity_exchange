@@ -1,12 +1,12 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { QueryFailedError } from 'typeorm';
 
 import { AuthService } from './auth.service';
+import { UsersRegistrationService } from '../users/users-registration.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
-import { WalletService } from '../wallet/wallet.service';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -28,8 +28,7 @@ const mockUser: User = {
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: jest.Mocked<UsersService>;
-  let walletService: jest.Mocked<WalletService>;
-  let dataSource: { transaction: jest.Mock };
+  let usersRegistrationService: jest.Mocked<UsersRegistrationService>;
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -38,43 +37,33 @@ describe('AuthService', () => {
         {
           provide: UsersService,
           useValue: {
-            create: jest.fn(),
             findByEmail: jest.fn(),
             findById: jest.fn(),
           },
         },
         {
-          provide: WalletService,
+          provide: UsersRegistrationService,
           useValue: {
-            createWalletForUser: jest.fn(),
+            registerWithWallet: jest.fn(),
           },
         },
         {
           provide: JwtService,
           useValue: { sign: jest.fn().mockReturnValue('mock-jwt-token') },
         },
-        {
-          provide: DataSource,
-          useValue: {
-            transaction: jest.fn(async (cb: (manager: unknown) => unknown) =>
-              cb({ getRepository: jest.fn() }),
-            ),
-          },
-        },
       ],
     }).compile();
 
     service = module.get(AuthService);
     usersService = module.get(UsersService);
-    walletService = module.get(WalletService);
-    dataSource = module.get(DataSource);
+    usersRegistrationService = module.get(UsersRegistrationService);
   });
 
   afterEach(() => jest.clearAllMocks());
 
   describe('register', () => {
     it('creates user and returns access token', async () => {
-      usersService.create.mockResolvedValue(mockUser);
+      usersRegistrationService.registerWithWallet.mockResolvedValue(mockUser);
 
       const result = await service.register({
         email: 'alice@demo.com',
@@ -86,16 +75,15 @@ describe('AuthService', () => {
       expect(result.user.email).toBe('alice@demo.com');
       expect((result.user as Record<string, unknown>)['passwordHash']).toBeUndefined();
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
-      expect(dataSource.transaction).toHaveBeenCalled();
-      expect(walletService.createWalletForUser).toHaveBeenCalledWith(
-        mockUser.id,
-        'USD',
-        expect.anything(),
-      );
+      expect(usersRegistrationService.registerWithWallet).toHaveBeenCalledWith({
+        email: 'alice@demo.com',
+        passwordHash: 'hashed-password',
+        username: 'alice',
+      });
     });
 
     it('throws ConflictException when email already exists', async () => {
-      usersService.create.mockRejectedValue(
+      usersRegistrationService.registerWithWallet.mockRejectedValue(
         new QueryFailedError('INSERT INTO users (...)', [], {
           code: '23505',
           detail: 'Key (email)=(alice@demo.com) already exists.',
@@ -110,8 +98,7 @@ describe('AuthService', () => {
         }),
       ).rejects.toThrow(ConflictException);
 
-      expect(usersService.create).toHaveBeenCalledTimes(1);
-      expect(walletService.createWalletForUser).not.toHaveBeenCalled();
+      expect(usersRegistrationService.registerWithWallet).toHaveBeenCalledTimes(1);
     });
   });
 

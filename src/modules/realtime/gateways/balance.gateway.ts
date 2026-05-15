@@ -81,14 +81,6 @@ export class BalanceGateway
     }
   }
 
-  private isAuthenticated(client: Socket): boolean {
-    return this.authenticatedUsers.has(client.id);
-  }
-
-  private getUserId(client: Socket): string | undefined {
-    return this.authenticatedUsers.get(client.id);
-  }
-
   broadcastBalanceUpdate(
     userId: string,
     balance: {
@@ -103,10 +95,6 @@ export class BalanceGateway
       timestamp: Date.now(),
       data: balance,
     });
-  }
-
-  getAuthenticatedUserCount(): number {
-    return this.authenticatedUsers.size;
   }
 }
 

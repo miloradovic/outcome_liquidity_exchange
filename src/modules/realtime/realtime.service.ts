@@ -30,8 +30,4 @@ export class RealtimeService {
   ): void {
     this.balanceGateway.broadcastBalanceUpdate(userId, balance);
   }
-
-  getAuthenticatedUserCount(): number {
-    return this.balanceGateway.getAuthenticatedUserCount();
-  }
 }

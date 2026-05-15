@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OrderBookProjectionService } from '../matching-engine/order-book-projection.service';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { ResolveMarketDto } from './dto/resolve-market.dto';
 import { MarketsService } from './markets.service';
@@ -25,7 +26,10 @@ import { MarketsService } from './markets.service';
 @ApiTags('markets')
 @Controller('markets')
 export class MarketsController {
-  constructor(private readonly marketsService: MarketsService) {}
+  constructor(
+    private readonly marketsService: MarketsService,
+    private readonly orderBookProjectionService: OrderBookProjectionService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all markets' })
@@ -56,7 +60,8 @@ export class MarketsController {
     description: 'Order book (YES and NO sides with price levels)',
   })
   async getOrderBook(@Param('marketId') marketId: string) {
-    return this.marketsService.getOrderBook(marketId);
+    await this.marketsService.getMarketById(marketId);
+    return this.orderBookProjectionService.getOrderBook(marketId);
   }
 
   @Post(':marketId/resolve')

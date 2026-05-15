@@ -4,11 +4,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
+import { UsersRegistrationService } from '../users/users-registration.service';
 import { UsersService } from '../users/users.service';
-import { WalletService } from '../wallet/wallet.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -25,9 +25,8 @@ type AuthUserProfile = Pick<
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly walletService: WalletService,
+    private readonly usersRegistrationService: UsersRegistrationService,
     private readonly jwtService: JwtService,
-    private readonly dataSource: DataSource,
   ) {}
 
   async register(
@@ -39,17 +38,10 @@ export class AuthService {
 
     let user: User;
     try {
-      user = await this.dataSource.transaction(async (manager) => {
-        const created = await this.usersService.create(
-          {
-            email: normalizedEmail,
-            passwordHash,
-            username,
-          },
-          manager,
-        );
-        await this.walletService.createWalletForUser(created.id, 'USD', manager);
-        return created;
+      user = await this.usersRegistrationService.registerWithWallet({
+        email: normalizedEmail,
+        passwordHash,
+        username,
       });
     } catch (error) {
       if (this.isDuplicateEmailError(error)) {

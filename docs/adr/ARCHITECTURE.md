@@ -252,6 +252,38 @@ Organize code as **module boundaries** that can later become **service boundarie
 
 ---
 
+## ADR-009: Enum Value Lifecycle for Safe Deprecation
+
+### Status: Accepted
+
+### Context
+Database enum columns (`markets.status`, `orders.status`) outlive any single release. Removing enum values directly from application code can break reads for historical rows and can make rollbacks unsafe.
+
+### Decision
+Use a 4-phase lifecycle for enum value deprecation:
+1. **Deprecate in code**: keep enum value in TypeScript and database, but stop writing it from business logic.
+2. **Observe**: verify the value is no longer produced and no rows still depend on it.
+3. **Backfill**: migrate any remaining rows to supported values.
+4. **Drop**: create a dedicated migration to rebuild the Postgres enum type without deprecated values.
+
+### Rationale
+1. **Rollback safety**: prior app versions can still read existing enum values.
+2. **Operational safety**: avoids destructive migrations until data is clean.
+3. **Auditability**: each phase is explicit and reviewable.
+4. **Zero surprise**: schema changes happen only after runtime behavior proves readiness.
+
+### Consequences
+- Deprecated values may remain in schema for one or more releases.
+- Application code should annotate legacy values clearly as compatibility-only.
+- Enum-drop migrations must be isolated and never bundled with unrelated features.
+
+### References
+- Market statuses: `src/modules/markets/enums/market-status.enum.ts`
+- Order statuses: `src/modules/markets/enums/order-status.enum.ts`
+- Initial enum DDL: `src/database/migrations/1746909600000-InitialSchema.ts`
+
+---
+
 ## Summary Table
 
 | ADR | Title | Status | Impact |
@@ -264,3 +296,4 @@ Organize code as **module boundaries** that can later become **service boundarie
 | 006 | WebSocket + REST | Accepted | Medium: realtime UX |
 | 007 | BullMQ for settlement | Accepted | Medium: isolation |
 | 008 | Modular monolith | Accepted | Medium: future path |
+| 009 | Enum lifecycle deprecation | Accepted | Medium: migration safety |
