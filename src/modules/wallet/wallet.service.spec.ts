@@ -134,6 +134,37 @@ describe('WalletService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('releases reserved funds back to available balance', async () => {
+    await service.reserve('user-1', 300, 'res-000003', 'order-3');
+
+    const released = await service.release('user-1', 200, 'rel-000001', 'order-3');
+    expect(released.availableBalanceCents).toBe(900);
+    expect(released.reservedBalanceCents).toBe(100);
+
+    await expect(service.release('user-1', 200, 'rel-000002', 'order-3')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('settles debits from reserved balance and blocks overdraft', async () => {
+    await service.reserve('user-1', 600, 'res-000004', 'order-4');
+
+    const settled = await service.settleDebit('user-1', 500, 'setd-000001', 'trade-1');
+    expect(settled.availableBalanceCents).toBe(400);
+    expect(settled.reservedBalanceCents).toBe(100);
+
+    await expect(service.settleDebit('user-1', 200, 'setd-000002', 'trade-1')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('credits settled funds to available balance', async () => {
+    const settled = await service.settleCredit('user-1', 450, 'setc-000001', 'trade-2');
+
+    expect(settled.availableBalanceCents).toBe(1_450);
+    expect(settled.reservedBalanceCents).toBe(0);
+  });
+
   it('replays idempotent key without applying mutation twice', async () => {
     dataSource.transaction.mockImplementationOnce(async (cb: (manager: unknown) => unknown) => {
       const txWalletRepo = {

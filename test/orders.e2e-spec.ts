@@ -1,14 +1,16 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
 import { MatchingEngineService } from '../src/modules/matching-engine/matching-engine.service';
 import { Market } from '../src/modules/markets/entities/market.entity';
 import { Outcome } from '../src/modules/markets/entities/outcome.entity';
 import { OutcomeSide } from '../src/modules/markets/enums/outcome-side.enum';
 import { MarketStatus } from '../src/modules/markets/enums/market-status.enum';
+import { waitForOrderStatus } from './helpers/polling';
 
 describe('Orders + Matching (e2e)', () => {
   let app: INestApplication;
@@ -25,10 +27,7 @@ describe('Orders + Matching (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
-    );
+    configureApp(app);
     await app.init();
 
     dataSource = app.get(DataSource);
@@ -136,8 +135,8 @@ describe('Orders + Matching (e2e)', () => {
     const yesOrderId = yesRes.body.id as string;
     const noOrderId = noRes.body.id as string;
 
-    await waitForOrderStatus(tokenA, yesOrderId, 'MATCHED');
-    await waitForOrderStatus(tokenB, noOrderId, 'MATCHED');
+    await waitForOrderStatus(app, tokenA, yesOrderId, 'MATCHED');
+    await waitForOrderStatus(app, tokenB, noOrderId, 'MATCHED');
 
     const walletA = await request(app.getHttpServer())
       .get('/api/wallet')
@@ -183,32 +182,5 @@ describe('Orders + Matching (e2e)', () => {
       .expect(201);
 
     return token;
-  }
-
-  async function waitForOrderStatus(
-    token: string,
-    orderId: string,
-    expectedStatus: string,
-  ): Promise<void> {
-    const attempts = 25;
-
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const res = await request(app.getHttpServer())
-        .get('/api/orders/me')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      const order = (res.body as Array<{ id: string; status: string }>).find(
-        (item) => item.id === orderId,
-      );
-
-      if (order?.status === expectedStatus) {
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 120));
-    }
-
-    throw new Error(`Order ${orderId} did not reach status ${expectedStatus}`);
   }
 });

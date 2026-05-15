@@ -17,6 +17,11 @@ import { Wallet } from '../../modules/wallet/entities/wallet.entity';
 
 const DEMO_PASSWORD = 'DemoPassword123!';
 const BCRYPT_ROUNDS = 10;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function daysFromNow(days: number): Date {
+  return new Date(Date.now() + days * DAY_IN_MS);
+}
 
 const DEMO_USERS = [
   { email: 'alice@demo.com', username: 'alice' },
@@ -31,17 +36,17 @@ const DEMO_MARKETS: Array<{
   {
     slug: 'btc-100k-2025',
     title: 'Will Bitcoin reach $100,000 by end of 2025?',
-    closesAt: new Date('2025-12-31T23:59:59Z'),
+    closesAt: daysFromNow(180),
   },
   {
     slug: 'fed-rate-cut-q1-2026',
     title: 'Will the Federal Reserve cut rates in Q1 2026?',
-    closesAt: new Date('2026-03-31T23:59:59Z'),
+    closesAt: daysFromNow(365),
   },
   {
     slug: 'ai-turing-test-2027',
     title: 'Will an AI pass the Turing Test before 2028?',
-    closesAt: new Date('2027-12-31T23:59:59Z'),
+    closesAt: daysFromNow(730),
   },
 ];
 
@@ -89,7 +94,16 @@ async function seed(): Promise<void> {
   for (const demo of DEMO_MARKETS) {
     const existing = await marketRepo.findOne({ where: { slug: demo.slug } });
     if (existing) {
-      console.log(`  SKIP  ${demo.slug} (already exists)`);
+      const closesAtInPast =
+        existing.closesAt !== null && existing.closesAt.getTime() <= Date.now();
+
+      if (existing.status === MarketStatus.OPEN && closesAtInPast) {
+        existing.closesAt = demo.closesAt;
+        await marketRepo.save(existing);
+        console.log(`  UPDATED  ${demo.slug} (moved closesAt into the future)`);
+      } else {
+        console.log(`  SKIP  ${demo.slug} (already exists)`);
+      }
       continue;
     }
 

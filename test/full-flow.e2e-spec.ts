@@ -9,29 +9,7 @@ import { Market } from '../src/modules/markets/entities/market.entity';
 import { Outcome } from '../src/modules/markets/entities/outcome.entity';
 import { MarketStatus } from '../src/modules/markets/enums/market-status.enum';
 import { OutcomeSide } from '../src/modules/markets/enums/outcome-side.enum';
-
-async function waitFor<T>(
-  fetchValue: () => Promise<T>,
-  assertValue: (value: T) => void,
-): Promise<T> {
-  const attempts = 25;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const value = await fetchValue();
-      assertValue(value);
-      return value;
-    } catch (error) {
-      if (attempt === attempts - 1) {
-        throw error;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 120));
-    }
-  }
-
-  throw new Error('Timed out waiting for expected state');
-}
+import { waitFor } from './helpers/polling';
 
 describe('Full Order Flow (e2e)', () => {
   let app: INestApplication;

@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
 import { WalletService } from '../src/modules/wallet/wallet.service';
 
 describe('Wallet Concurrency (e2e)', () => {
@@ -23,10 +24,7 @@ describe('Wallet Concurrency (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
-    );
+    configureApp(app);
     await app.init();
 
     walletService = app.get(WalletService);

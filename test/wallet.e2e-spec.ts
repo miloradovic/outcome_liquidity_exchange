@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
 
 describe('Wallet (e2e)', () => {
   let app: INestApplication;
@@ -20,10 +21,7 @@ describe('Wallet (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
-    );
+    configureApp(app);
     await app.init();
 
     const registerRes = await request(app.getHttpServer())

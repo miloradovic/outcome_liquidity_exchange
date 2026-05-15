@@ -101,12 +101,17 @@ export class MatchingEngineService implements OnApplicationBootstrap {
       return;
     }
 
-    await Promise.all([
-      this.projectionService.removeOpenOrder(matched.order),
-      this.projectionService.removeOpenOrder(matched.counterparty),
-    ]);
-
-    await this.broadcastService.broadcastTradeAndOrderBookUpdate(matched.trade);
+    try {
+      await Promise.all([
+        this.projectionService.removeOpenOrder(matched.order),
+        this.projectionService.removeOpenOrder(matched.counterparty),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.error(
+        `Failed to remove matched orders from projection for trade ${matched.trade.id}: ${message}`,
+      );
+    }
 
     try {
       await this.settlementQueueService.addSettlementJob(matched.trade.id);
@@ -124,7 +129,11 @@ export class MatchingEngineService implements OnApplicationBootstrap {
           `Failed to rollback trade ${matched.trade.id} after queue enqueue failure: ${rollbackMessage}`,
         );
       }
+
+      return;
     }
+
+    await this.broadcastService.broadcastTradeAndOrderBookUpdate(matched.trade);
   }
 
   async rebuildFromOpenOrders(): Promise<void> {
