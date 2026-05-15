@@ -14,10 +14,17 @@ async function bootstrap(): Promise<void> {
   configureApp(app);
 
   const port = appConfig.get<number>('PORT', 3000);
+  const nodeEnv = appConfig.get<string>('NODE_ENV', 'development');
+  const swaggerEnabled = appConfig.get<boolean>(
+    'SWAGGER_ENABLED',
+    nodeEnv !== 'production',
+  );
 
   await app.listen(port);
   Logger.log(`HTTP server running on http://localhost:${port}/api`, 'Bootstrap');
-  Logger.log(`Swagger docs available at http://localhost:${port}/docs`, 'Bootstrap');
+  if (swaggerEnabled) {
+    Logger.log(`Swagger docs available at http://localhost:${port}/docs`, 'Bootstrap');
+  }
 }
 
 void bootstrap();

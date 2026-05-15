@@ -12,7 +12,11 @@ export class UsersService {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email: this.normalizeEmail(email) })
+      .getOne();
   }
 
   async findById(id: string): Promise<User | null> {
@@ -25,12 +29,21 @@ export class UsersService {
     username: string;
   }, manager?: EntityManager): Promise<User> {
     const repo = manager ? manager.getRepository(User) : this.usersRepository;
-    const user = repo.create(data);
+    const user = repo.create({
+      ...data,
+      email: this.normalizeEmail(data.email),
+    });
     return repo.save(user);
   }
 
   async existsByEmail(email: string): Promise<boolean> {
-    const count = await this.usersRepository.count({ where: { email } });
+    const count = await this.usersRepository.count({
+      where: { email: this.normalizeEmail(email) },
+    });
     return count > 0;
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
   }
 }

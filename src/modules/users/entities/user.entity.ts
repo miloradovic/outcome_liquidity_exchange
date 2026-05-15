@@ -1,10 +1,13 @@
 import {
+  BeforeInsert,
+  BeforeUpdate,
   Column,
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class User {
@@ -14,7 +17,8 @@ export class User {
   @Column({ unique: true, length: 255 })
   email!: string;
 
-  @Column({ name: 'password_hash', length: 255 })
+  @Exclude()
+  @Column({ name: 'password_hash', length: 255, select: false })
   passwordHash!: string;
 
   @Column({ length: 100 })
@@ -25,4 +29,10 @@ export class User {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  normalizeEmail(): void {
+    this.email = this.email.trim().toLowerCase();
+  }
 }

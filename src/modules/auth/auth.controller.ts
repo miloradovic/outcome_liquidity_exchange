@@ -22,6 +22,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 
+type CurrentUserProfile = Pick<
+  User,
+  'id' | 'email' | 'username' | 'createdAt' | 'updatedAt'
+>;
+
 @ApiTags('auth')
 @Controller()
 export class AuthController {
@@ -75,7 +80,7 @@ export class AuthController {
     description: 'User profile retrieved',
     type: User,
   })
-  getMe(@CurrentUser() user: User): Omit<User, 'passwordHash'> {
+  getMe(@CurrentUser() user: User): CurrentUserProfile {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _hash, ...profile } = user;
     return profile;

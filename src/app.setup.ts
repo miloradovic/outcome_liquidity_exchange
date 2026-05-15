@@ -1,5 +1,10 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { parseAllowedOrigins } from './config/origins.util';
 
@@ -23,6 +28,20 @@ export function configureApp(app: INestApplication): void {
       forbidUnknownValues: true,
     }),
   );
+
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(app.get(Reflector)),
+  );
+
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  const swaggerEnabled = configService.get<boolean>(
+    'SWAGGER_ENABLED',
+    nodeEnv !== 'production',
+  );
+
+  if (!swaggerEnabled) {
+    return;
+  }
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Outcome Liquidity Exchange')

@@ -14,9 +14,12 @@ services:
       DB_USER: ${DB_USER:-exchange}
       DB_PASSWORD: ${DB_PASSWORD:-exchange}
       DB_NAME: ${DB_NAME:-exchange}
+      DB_SSL: ${DB_SSL:-false}
+      DB_SSL_REJECT_UNAUTHORIZED: ${DB_SSL_REJECT_UNAUTHORIZED:-true}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-this-secret-1234567890}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       HTTP_ALLOWED_ORIGINS: ${HTTP_ALLOWED_ORIGINS:-http://localhost:3001}
       WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-http://localhost:3001}
     ports:

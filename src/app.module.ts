@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { typeOrmConfig } from './config/typeorm.config';
@@ -25,6 +27,12 @@ import { JobsModule } from './modules/jobs/jobs.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => typeOrmConfig(config),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 100,
+      },
+    ]),
     HealthModule,
     UsersModule,
     AuthModule,
@@ -34,6 +42,12 @@ import { JobsModule } from './modules/jobs/jobs.module';
     MatchingEngineModule,
     JobsModule,
     //RealtimeModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

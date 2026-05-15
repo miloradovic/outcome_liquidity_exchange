@@ -1,4 +1,5 @@
-import { IsEmail, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsEmail, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -6,6 +7,9 @@ export class LoginDto {
     description: 'User email address',
     example: 'user@example.com',
   })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   email!: string;
 
@@ -14,5 +18,6 @@ export class LoginDto {
     example: 'SecurePassword123',
   })
   @IsString()
+  @MaxLength(100)
   password!: string;
 }

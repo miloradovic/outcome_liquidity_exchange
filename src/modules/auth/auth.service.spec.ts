@@ -1,7 +1,7 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
@@ -22,6 +22,7 @@ const mockUser: User = {
   username: 'alice',
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
+  normalizeEmail: jest.fn(),
 };
 
 describe('AuthService', () => {
@@ -37,7 +38,6 @@ describe('AuthService', () => {
         {
           provide: UsersService,
           useValue: {
-            existsByEmail: jest.fn(),
             create: jest.fn(),
             findByEmail: jest.fn(),
             findById: jest.fn(),
@@ -74,7 +74,6 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('creates user and returns access token', async () => {
-      usersService.existsByEmail.mockResolvedValue(false);
       usersService.create.mockResolvedValue(mockUser);
 
       const result = await service.register({
@@ -96,7 +95,12 @@ describe('AuthService', () => {
     });
 
     it('throws ConflictException when email already exists', async () => {
-      usersService.existsByEmail.mockResolvedValue(true);
+      usersService.create.mockRejectedValue(
+        new QueryFailedError('INSERT INTO users (...)', [], {
+          code: '23505',
+          detail: 'Key (email)=(alice@demo.com) already exists.',
+        } as Error & { code: string; detail: string }),
+      );
 
       await expect(
         service.register({
@@ -106,7 +110,8 @@ describe('AuthService', () => {
         }),
       ).rejects.toThrow(ConflictException);
 
-      expect(usersService.create).not.toHaveBeenCalled();
+      expect(usersService.create).toHaveBeenCalledTimes(1);
+      expect(walletService.createWalletForUser).not.toHaveBeenCalled();
     });
   });
 
