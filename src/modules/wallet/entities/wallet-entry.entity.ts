@@ -50,6 +50,6 @@ export class WalletEntry {
   @Column({ name: 'idempotency_key', length: 100 })
   idempotencyKey!: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }

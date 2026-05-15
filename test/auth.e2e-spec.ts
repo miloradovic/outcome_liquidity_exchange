@@ -111,4 +111,29 @@ describe('Auth (e2e)', () => {
       await request(app.getHttpServer()).get('/api/auth/me').expect(401);
     });
   });
+
+  describe('POST /api/auth/logout', () => {
+    let accessToken: string;
+
+    beforeAll(async () => {
+      const loginRes = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: testUser.email, password: testUser.password })
+        .expect(200);
+      accessToken = loginRes.body.accessToken as string;
+    });
+
+    it('revokes current token and blocks subsequent authenticated requests', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200)
+        .expect({ success: true });
+
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(401);
+    });
+  });
 });

@@ -79,6 +79,7 @@ src/modules/
 ### Authentication
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Get JWT access token
+- `POST /api/auth/logout` - Revoke current JWT token
 - `GET /api/auth/me` - Get current user profile
 
 ### Wallet (Protected)
@@ -131,8 +132,8 @@ WalletEntry (immutable ledger):
 Market:
   - id (UUID, PK)
   - slug, title (metadata)
-  - status (OPEN | CLOSED | RESOLVED)
-  - closes_at (timestamp)
+  - status (OPEN | RESOLVED)
+  - closes_at (timestamptz)
 
 Outcome:
   - id (UUID, PK)
@@ -147,7 +148,7 @@ Order:
   - price_cents (1-99)
   - quantity (positive integer)
   - reserved_cents (price_cents * quantity)
-  - status (OPEN | MATCH_PENDING | MATCHED | CANCELLED | EXPIRED | SETTLEMENT_FAILED)
+  - status (OPEN | MATCH_PENDING | MATCHED | CANCELLED | SETTLEMENT_FAILED)
   - idempotency_key (string, unique per user)
   - created_at
 

@@ -4,7 +4,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Req,
   Post,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -21,6 +23,7 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import type { Request } from 'express';
 
 type CurrentUserProfile = Pick<
   User,
@@ -71,6 +74,30 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout and revoke current JWT token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Token revoked successfully',
+    schema: {
+      example: {
+        success: true,
+      },
+    },
+  })
+  async logout(@Req() request: Request) {
+    const token = this.extractBearerToken(request);
+    if (!token) {
+      throw new UnauthorizedException('Authorization token missing');
+    }
+
+    await this.authService.logout(token);
+    return { success: true };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -84,5 +111,19 @@ export class AuthController {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _hash, ...profile } = user;
     return profile;
+  }
+
+  private extractBearerToken(request: Request): string | null {
+    const authorization = request.headers.authorization;
+    if (!authorization) {
+      return null;
+    }
+
+    const [type, token] = authorization.split(' ');
+    if (type !== 'Bearer' || !token) {
+      return null;
+    }
+
+    return token;
   }
 }

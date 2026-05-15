@@ -7,6 +7,7 @@ import type { StringValue } from 'ms';
 import { RedisModule } from '../redis/redis.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
+import { AuthTokenRevocationService } from './auth-token-revocation.service';
 import { AuthUserCacheService } from './auth-user-cache.service';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -27,7 +28,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthUserCacheService, JwtStrategy],
+  providers: [
+    AuthService,
+    AuthTokenRevocationService,
+    AuthUserCacheService,
+    JwtStrategy,
+  ],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

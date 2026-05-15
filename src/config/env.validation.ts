@@ -26,7 +26,7 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().min(32).required().invalid(DEV_JWT_SECRET),
     otherwise: Joi.string().min(32).default(DEV_JWT_SECRET),
   }),
-  JWT_EXPIRES_IN: Joi.string().default('7d'),
+  JWT_EXPIRES_IN: Joi.string().default('1d'),
   SWAGGER_ENABLED: Joi.when('NODE_ENV', {
     is: 'production',
     then: Joi.boolean().default(false),

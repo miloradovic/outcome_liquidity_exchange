@@ -35,6 +35,10 @@ export class RedisKeyspaceService {
     return this.buildKey('auth', 'user', userId);
   }
 
+  getAuthRevokedTokenKey(tokenHash: string): string {
+    return this.buildKey('auth', 'revoked-token', tokenHash);
+  }
+
   private buildKey(...parts: string[]): string {
     return [this.keyPrefix, ...parts].join(':');
   }

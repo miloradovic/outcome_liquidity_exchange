@@ -5,10 +5,9 @@ export type OrderStatus =
   | 'MATCH_PENDING'
   | 'MATCHED'
   | 'CANCELLED'
-  | 'EXPIRED'
   | 'SETTLEMENT_FAILED';
 
-export type MarketStatus = 'OPEN' | 'CLOSED' | 'RESOLVED';
+export type MarketStatus = 'OPEN' | 'RESOLVED';
 
 export type WalletEntryType =
   | 'DEPOSIT'

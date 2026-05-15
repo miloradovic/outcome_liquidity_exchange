@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -14,6 +15,7 @@ const mockUser: User = {
   username: 'alice',
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
+  normalizeEmail: jest.fn(),
 };
 
 const mockAuthResponse = {
@@ -40,6 +42,7 @@ describe('AuthController', () => {
           useValue: {
             register: jest.fn(),
             login: jest.fn(),
+            logout: jest.fn(),
           },
         },
       ],
@@ -87,6 +90,25 @@ describe('AuthController', () => {
       expect(result.id).toBe(mockUser.id);
       expect(result.email).toBe(mockUser.email);
       expect((result as Record<string, unknown>)['passwordHash']).toBeUndefined();
+    });
+  });
+
+  describe('POST /auth/logout', () => {
+    it('delegates to AuthService and returns success payload', async () => {
+      authService.logout.mockResolvedValue();
+
+      const result = await controller.logout({
+        headers: { authorization: 'Bearer mock-token' },
+      } as never);
+
+      expect(result).toEqual({ success: true });
+      expect(authService.logout).toHaveBeenCalledWith('mock-token');
+    });
+
+    it('throws UnauthorizedException when bearer token is missing', async () => {
+      await expect(
+        controller.logout({ headers: {} } as never),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

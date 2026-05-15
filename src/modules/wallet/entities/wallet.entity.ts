@@ -34,9 +34,9 @@ export class Wallet {
   @Column({ name: 'reserved_balance_cents', type: 'int', default: 0 })
   reservedBalanceCents!: number;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

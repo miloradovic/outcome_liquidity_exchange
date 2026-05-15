@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
+import { AuthTokenRevocationService } from './auth-token-revocation.service';
 import { UsersRegistrationService } from '../users/users-registration.service';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -27,6 +28,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly usersRegistrationService: UsersRegistrationService,
     private readonly jwtService: JwtService,
+    private readonly authTokenRevocationService: AuthTokenRevocationService,
   ) {}
 
   async register(
@@ -72,6 +74,11 @@ export class AuthService {
     return { accessToken: this.issueToken(user), user: this.sanitize(user) };
   }
 
+  async logout(accessToken: string): Promise<void> {
+    const expUnixSeconds = this.extractExpiry(accessToken);
+    await this.authTokenRevocationService.revokeToken(accessToken, expUnixSeconds);
+  }
+
   private issueToken(user: User): string {
     const payload: JwtPayload = { sub: user.id, email: user.email };
     return this.jwtService.sign(payload);
@@ -85,6 +92,16 @@ export class AuthService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private extractExpiry(accessToken: string): number | null {
+    const decoded = this.jwtService.decode(accessToken);
+    if (!decoded || typeof decoded === 'string') {
+      return null;
+    }
+
+    const expValue = decoded['exp'];
+    return typeof expValue === 'number' ? expValue : null;
   }
 
   private isDuplicateEmailError(error: unknown): boolean {

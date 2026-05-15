@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { QueryFailedError } from 'typeorm';
 
 import { AuthService } from './auth.service';
+import { AuthTokenRevocationService } from './auth-token-revocation.service';
 import { UsersRegistrationService } from '../users/users-registration.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
@@ -27,6 +28,8 @@ const mockUser: User = {
 
 describe('AuthService', () => {
   let service: AuthService;
+  let jwtService: jest.Mocked<JwtService>;
+  let authTokenRevocationService: jest.Mocked<AuthTokenRevocationService>;
   let usersService: jest.Mocked<UsersService>;
   let usersRegistrationService: jest.Mocked<UsersRegistrationService>;
 
@@ -49,12 +52,23 @@ describe('AuthService', () => {
         },
         {
           provide: JwtService,
-          useValue: { sign: jest.fn().mockReturnValue('mock-jwt-token') },
+          useValue: {
+            sign: jest.fn().mockReturnValue('mock-jwt-token'),
+            decode: jest.fn(),
+          },
+        },
+        {
+          provide: AuthTokenRevocationService,
+          useValue: {
+            revokeToken: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get(AuthService);
+    jwtService = module.get(JwtService);
+    authTokenRevocationService = module.get(AuthTokenRevocationService);
     usersService = module.get(UsersService);
     usersRegistrationService = module.get(UsersRegistrationService);
   });
@@ -131,6 +145,30 @@ describe('AuthService', () => {
       await expect(
         service.login({ email: 'alice@demo.com', password: 'wrong-password' }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('logout', () => {
+    it('revokes token using decoded expiry claim', async () => {
+      jwtService.decode.mockReturnValue({ exp: 1_800_000_000 });
+
+      await service.logout('jwt-token');
+
+      expect(authTokenRevocationService.revokeToken).toHaveBeenCalledWith(
+        'jwt-token',
+        1_800_000_000,
+      );
+    });
+
+    it('revokes token with null expiry when decode result is invalid', async () => {
+      jwtService.decode.mockReturnValue('invalid-payload');
+
+      await service.logout('jwt-token');
+
+      expect(authTokenRevocationService.revokeToken).toHaveBeenCalledWith(
+        'jwt-token',
+        null,
+      );
     });
   });
 });
