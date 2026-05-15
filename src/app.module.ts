@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { TypeOrmExceptionFilter } from './common/filters/typeorm-exception.filter';
 import { typeOrmConfig } from './config/typeorm.config';
 import { envValidationSchema } from './config/env.validation';
 import { HealthModule } from './modules/health/health.module';
@@ -44,6 +45,10 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
     RealtimeModule,
   ],
   providers: [
+    {
+      provide: APP_FILTER,
+      useClass: TypeOrmExceptionFilter,
+    },
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

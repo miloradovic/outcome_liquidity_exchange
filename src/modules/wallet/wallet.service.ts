@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
+import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
 import { WalletEntryType } from './enums/wallet-entry-type.enum';
 import { WalletReferenceType } from './enums/wallet-reference-type.enum';
 import { WalletEntry } from './entities/wallet-entry.entity';
@@ -51,12 +52,17 @@ export class WalletService {
     return wallet;
   }
 
-  async getEntriesForUser(userId: string): Promise<WalletEntry[]> {
+  async getEntriesForUser(
+    userId: string,
+    pagination: PaginationParams = DEFAULT_PAGINATION,
+  ): Promise<WalletEntry[]> {
     const wallet = await this.getWalletByUserId(userId);
+    const { limit, offset } = pagination;
     return this.walletEntryRepository.find({
       where: { walletId: wallet.id },
       order: { createdAt: 'DESC' },
-      take: 100,
+      take: limit,
+      skip: offset,
     });
   }
 

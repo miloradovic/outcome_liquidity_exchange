@@ -79,22 +79,22 @@ src/modules/
 ### Authentication
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Get JWT access token
-- `GET /api/me` - Get current user profile
+- `GET /api/auth/me` - Get current user profile
 
 ### Wallet (Protected)
 - `GET /api/wallet` - Get wallet balance (available + reserved)
-- `GET /api/wallet/entries` - Get transaction history
+- `GET /api/wallet/entries?limit=100&offset=0` - Get transaction history (paginated)
 - `POST /api/wallet/deposit` - Deposit demo funds
 
 ### Markets (Public)
-- `GET /api/markets` - List all markets
+- `GET /api/markets?limit=100&offset=0` - List markets (paginated)
 - `GET /api/markets/:marketId` - Get market details and outcomes
 - `GET /api/markets/:marketId/order-book` - Get live order book
 
 ### Orders (Protected)
 - `POST /api/orders` - Place a new order
 - `DELETE /api/orders/:orderId` - Cancel an open order
-- `GET /api/orders/me` - Get current user's orders
+- `GET /api/orders/me?limit=100&offset=0` - Get current user's orders (paginated)
 
 ### Realtime Updates (WebSocket)
 - **Public**: `ws://localhost:3000/order-book`

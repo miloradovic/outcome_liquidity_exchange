@@ -136,7 +136,7 @@ export const apiClient = {
   },
 
   getMe(token: string): Promise<UserProfile> {
-    return apiRequest<UserProfile>('/me', {
+    return apiRequest<UserProfile>('/auth/me', {
       token,
     });
   },

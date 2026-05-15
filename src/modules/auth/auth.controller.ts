@@ -28,11 +28,11 @@ type CurrentUserProfile = Pick<
 >;
 
 @ApiTags('auth')
-@Controller()
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('auth/register')
+  @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
@@ -50,7 +50,7 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
-  @Post('auth/login')
+  @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and receive JWT token' })
   @ApiBody({ type: LoginDto })

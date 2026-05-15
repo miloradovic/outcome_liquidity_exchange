@@ -21,7 +21,7 @@ export class User {
   @Column({ name: 'password_hash', length: 255, select: false })
   passwordHash!: string;
 
-  @Column({ length: 100 })
+  @Column({ unique: true, length: 100 })
   username!: string;
 
   @CreateDateColumn({ name: 'created_at' })

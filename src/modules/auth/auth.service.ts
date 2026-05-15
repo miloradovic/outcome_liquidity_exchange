@@ -55,6 +55,9 @@ export class AuthService {
       if (this.isDuplicateEmailError(error)) {
         throw new ConflictException('Email already registered');
       }
+      if (this.isDuplicateUsernameError(error)) {
+        throw new ConflictException('Username is already taken');
+      }
       throw error;
     }
 
@@ -93,6 +96,14 @@ export class AuthService {
   }
 
   private isDuplicateEmailError(error: unknown): boolean {
+    return this.isDuplicateConstraintError(error, '(email)');
+  }
+
+  private isDuplicateUsernameError(error: unknown): boolean {
+    return this.isDuplicateConstraintError(error, '(username)');
+  }
+
+  private isDuplicateConstraintError(error: unknown, key: string): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;
     }
@@ -103,7 +114,7 @@ export class AuthService {
 
     return (
       driverError?.code === UNIQUE_VIOLATION_CODE &&
-      (driverError.detail?.includes('(email)') ?? false)
+      (driverError.detail?.includes(key) ?? false)
     );
   }
 }

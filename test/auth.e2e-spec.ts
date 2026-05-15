@@ -87,7 +87,7 @@ describe('Auth (e2e)', () => {
     });
   });
 
-  describe('GET /api/me', () => {
+  describe('GET /api/auth/me', () => {
     let accessToken: string;
 
     beforeAll(async () => {
@@ -99,7 +99,7 @@ describe('Auth (e2e)', () => {
 
     it('returns profile for authenticated user', async () => {
       const response = await request(app.getHttpServer())
-        .get('/api/me')
+        .get('/api/auth/me')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -108,7 +108,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('rejects unauthenticated request with 401', async () => {
-      await request(app.getHttpServer()).get('/api/me').expect(401);
+      await request(app.getHttpServer()).get('/api/auth/me').expect(401);
     });
   });
 });

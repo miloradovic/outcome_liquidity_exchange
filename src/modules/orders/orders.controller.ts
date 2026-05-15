@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import {
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { User } from '../users/entities/user.entity';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { OrdersService } from './orders.service';
@@ -55,7 +57,7 @@ export class OrdersController {
     status: 200,
     description: 'List of user orders',
   })
-  async getMyOrders(@CurrentUser() user: User) {
-    return this.ordersService.getMyOrders(user.id);
+  async getMyOrders(@CurrentUser() user: User, @Query() pagination: PaginationQueryDto) {
+    return this.ordersService.getMyOrders(user.id, pagination);
   }
 }

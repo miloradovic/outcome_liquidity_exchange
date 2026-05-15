@@ -38,7 +38,7 @@ describe('Wallet Concurrency (e2e)', () => {
     accessToken = registerRes.body.accessToken as string;
 
     const meRes = await request(app.getHttpServer())
-      .get('/api/me')
+      .get('/api/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     userId = meRes.body.id as string;

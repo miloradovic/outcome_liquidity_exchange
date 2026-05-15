@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -8,6 +8,7 @@ import {
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { User } from '../users/entities/user.entity';
 import { DepositDto } from './dto/deposit.dto';
 import { WalletService } from './wallet.service';
@@ -45,8 +46,8 @@ export class WalletController {
     status: 200,
     description: 'Wallet entries retrieved',
   })
-  async getWalletEntries(@CurrentUser() user: User) {
-    return this.walletService.getEntriesForUser(user.id);
+  async getWalletEntries(@CurrentUser() user: User, @Query() pagination: PaginationQueryDto) {
+    return this.walletService.getEntriesForUser(user.id, pagination);
   }
 
   @Post('deposit')

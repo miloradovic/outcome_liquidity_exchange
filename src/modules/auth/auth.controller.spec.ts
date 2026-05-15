@@ -80,7 +80,7 @@ describe('AuthController', () => {
     });
   });
 
-  describe('GET /me', () => {
+  describe('GET /auth/me', () => {
     it('returns user profile without passwordHash', () => {
       const result = controller.getMe(mockUser);
 

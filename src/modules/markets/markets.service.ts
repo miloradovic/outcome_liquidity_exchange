@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 
+import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
 import { MatchingEngineService, OrderBookView } from '../matching-engine/matching-engine.service';
 import { WalletService } from '../wallet/wallet.service';
 import { Market } from './entities/market.entity';
@@ -27,10 +28,15 @@ export class MarketsService {
     private readonly matchingEngineService: MatchingEngineService,
   ) {}
 
-  async getMarkets(): Promise<Market[]> {
+  async getMarkets(
+    pagination: PaginationParams = DEFAULT_PAGINATION,
+  ): Promise<Market[]> {
+    const { limit, offset } = pagination;
     return this.marketRepository.find({
       relations: { outcomes: true },
       order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
     });
   }
 

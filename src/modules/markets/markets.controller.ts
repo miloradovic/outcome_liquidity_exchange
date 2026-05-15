@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { ResolveMarketDto } from './dto/resolve-market.dto';
 import { MarketsService } from './markets.service';
 
@@ -31,8 +33,8 @@ export class MarketsController {
     status: 200,
     description: 'List of all markets',
   })
-  async getMarkets() {
-    return this.marketsService.getMarkets();
+  async getMarkets(@Query() pagination: PaginationQueryDto) {
+    return this.marketsService.getMarkets(pagination);
   }
 
   @Get(':marketId')

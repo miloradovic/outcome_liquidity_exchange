@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
+import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
 import { MatchingEngineService } from '../matching-engine/matching-engine.service';
 import { Market } from '../markets/entities/market.entity';
 import { Order } from '../markets/entities/order.entity';
@@ -141,10 +142,16 @@ export class OrdersService {
     return cancelled;
   }
 
-  async getMyOrders(userId: string): Promise<Order[]> {
+  async getMyOrders(
+    userId: string,
+    pagination: PaginationParams = DEFAULT_PAGINATION,
+  ): Promise<Order[]> {
+    const { limit, offset } = pagination;
     return this.orderRepository.find({
       where: { userId },
       order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
     });
   }
 }
