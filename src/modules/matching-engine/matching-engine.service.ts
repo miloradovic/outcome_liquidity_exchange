@@ -80,6 +80,7 @@ export class MatchingEngineService implements OnModuleInit, OnApplicationBootstr
       .hset(hashKey, {
         marketId: order.marketId,
         side: order.side,
+        priceCents: String(order.priceCents),
         quantity: String(order.quantity),
       })
       .exec();
@@ -357,19 +358,29 @@ export class MatchingEngineService implements OnModuleInit, OnApplicationBootstr
 
   private async buildLevels(orderIds: string[]): Promise<OrderBookLevel[]> {
     const levels = new Map<number, number>();
+    if (orderIds.length === 0) {
+      return [];
+    }
 
+    const pipeline = this.redis.pipeline();
     for (const orderId of orderIds) {
-      const hash = await this.redis.hgetall(this.orderHashKey(orderId));
-      const quantity = parseInt(hash.quantity ?? '0', 10);
-      const side = hash.side as OutcomeSide | undefined;
-      const marketId = hash.marketId;
-      if (!side || !marketId || quantity <= 0) {
+      pipeline.hmget(this.orderHashKey(orderId), 'quantity', 'priceCents');
+    }
+
+    const results = await pipeline.exec();
+    if (!results) {
+      return [];
+    }
+
+    for (const [error, data] of results) {
+      if (error || !Array.isArray(data)) {
         continue;
       }
 
-      const score = await this.redis.zscore(this.sideKey(marketId, side), orderId);
-      const priceCents = parseInt(score ?? '0', 10);
-      if (priceCents <= 0) {
+      const [quantityValue, priceValue] = data as [string | null, string | null];
+      const quantity = parseInt(quantityValue ?? '0', 10);
+      const priceCents = parseInt(priceValue ?? '0', 10);
+      if (quantity <= 0 || priceCents <= 0) {
         continue;
       }
 
