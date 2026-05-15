@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 
 import { SettlementQueueService } from '../jobs/settlement-queue.service';
@@ -74,6 +75,8 @@ describe('MatchingEngineService', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('releases reserved balances when settlement enqueue fails', async () => {
+    const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
     const incomingOrder = {
       id: 'order-yes-1',
       userId: 'user-yes',
@@ -205,6 +208,11 @@ describe('MatchingEngineService', () => {
       counterpartyOrder.userId,
     ]);
     expect(broadcastService.broadcastTradeAndOrderBookUpdate).not.toHaveBeenCalled();
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      `Failed to enqueue settlement for trade ${pendingTrade.id}: queue unavailable`,
+    );
+    loggerErrorSpy.mockRestore();
   });
 
   it('reopens orphan MATCH_PENDING orders on bootstrap', async () => {
