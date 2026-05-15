@@ -54,9 +54,7 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
     const { tradeId } = job.data;
 
     try {
-      const settledUserIds: string[] = [];
-
-      await this.dataSource.transaction(async (manager) => {
+      const settledUserIds = await this.dataSource.transaction(async (manager) => {
         const tradeRepo = manager.getRepository(Trade);
         const orderRepo = manager.getRepository(Order);
 
@@ -66,7 +64,7 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
         });
 
         if (!trade || trade.status !== TradeStatus.PENDING_SETTLEMENT) {
-          return;
+          return [] as string[];
         }
 
         const yesOrder = await orderRepo.findOne({
@@ -82,6 +80,8 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
           throw new Error('Related orders were not found for settlement');
         }
 
+        // V1 settlement commits reserved collateral. Payout crediting is part of
+        // market resolution, which is not implemented yet.
         await this.walletService.settleDebit(
           yesOrder.userId,
           yesOrder.reservedCents,
@@ -104,31 +104,19 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
         await orderRepo.save([yesOrder, noOrder]);
         await tradeRepo.save(trade);
 
-        settledUserIds.push(yesOrder.userId, noOrder.userId);
+        return [yesOrder.userId, noOrder.userId];
       });
 
-      // Emit balance updates for settled users
-      for (const userId of settledUserIds) {
-        try {
-          const wallet = await this.walletService.getWalletByUserId(userId);
-          this.realtimeService.broadcastBalanceUpdate(userId, {
-            availableBalanceCents: wallet.availableBalanceCents,
-            reservedBalanceCents: wallet.reservedBalanceCents,
-          });
-        } catch (error) {
-          this.logger.warn(
-            `Failed to broadcast balance update for user ${userId}: ${error}`,
-          );
-        }
-      }
+      await this.broadcastBalanceUpdates(settledUserIds);
     } catch (error) {
-      await this.markSettlementFailure(tradeId);
+      const releasedUserIds = await this.markSettlementFailure(tradeId);
+      await this.broadcastBalanceUpdates(releasedUserIds);
       throw error;
     }
   }
 
-  private async markSettlementFailure(tradeId: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+  private async markSettlementFailure(tradeId: string): Promise<string[]> {
+    return this.dataSource.transaction(async (manager) => {
       const tradeRepo = manager.getRepository(Trade);
       const orderRepo = manager.getRepository(Order);
 
@@ -137,21 +125,63 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
         lock: { mode: 'pessimistic_write' },
       });
       if (!trade || trade.status !== TradeStatus.PENDING_SETTLEMENT) {
-        return;
+        return [] as string[];
       }
+
+      const yesOrder = await orderRepo.findOne({
+        where: { id: trade.yesOrderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const noOrder = await orderRepo.findOne({
+        where: { id: trade.noOrderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!yesOrder || !noOrder) {
+        throw new Error('Related orders were not found while marking settlement failure');
+      }
+
+      await this.walletService.release(
+        yesOrder.userId,
+        yesOrder.reservedCents,
+        `trade:${trade.id}:yes-release`,
+        yesOrder.id,
+        manager,
+      );
+      await this.walletService.release(
+        noOrder.userId,
+        noOrder.reservedCents,
+        `trade:${trade.id}:no-release`,
+        noOrder.id,
+        manager,
+      );
 
       trade.status = TradeStatus.FAILED;
       await tradeRepo.save(trade);
 
-      await orderRepo.update(
-        { id: trade.yesOrderId },
-        { status: OrderStatus.SETTLEMENT_FAILED },
-      );
-      await orderRepo.update(
-        { id: trade.noOrderId },
-        { status: OrderStatus.SETTLEMENT_FAILED },
-      );
+      yesOrder.status = OrderStatus.SETTLEMENT_FAILED;
+      noOrder.status = OrderStatus.SETTLEMENT_FAILED;
+      await orderRepo.save([yesOrder, noOrder]);
+
+      return [yesOrder.userId, noOrder.userId];
     });
+  }
+
+  private async broadcastBalanceUpdates(userIds: string[]): Promise<void> {
+    for (const userId of new Set(userIds)) {
+      try {
+        const wallet = await this.walletService.getWalletByUserId(userId);
+        this.realtimeService.broadcastBalanceUpdate(userId, {
+          availableBalanceCents: wallet.availableBalanceCents,
+          reservedBalanceCents: wallet.reservedBalanceCents,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `Failed to broadcast balance update for user ${userId}: ${message}`,
+        );
+      }
+    }
   }
 
   async onModuleDestroy(): Promise<void> {

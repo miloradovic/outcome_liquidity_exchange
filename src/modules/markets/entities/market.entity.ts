@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 
 import { MarketStatus } from '../enums/market-status.enum';
+import { OutcomeSide } from '../enums/outcome-side.enum';
 import { Outcome } from './outcome.entity';
 import { Order } from './order.entity';
 import { Trade } from './trade.entity';
@@ -27,6 +28,15 @@ export class Market {
 
   @Column({ name: 'closes_at', type: 'timestamptz', nullable: true })
   closesAt!: Date | null;
+
+  @Column({
+    name: 'resolved_outcome',
+    type: 'enum',
+    enum: OutcomeSide,
+    enumName: 'outcomes_side_enum',
+    nullable: true,
+  })
+  resolvedOutcome!: OutcomeSide | null;
 
   @OneToMany(() => Outcome, (outcome) => outcome.market, { cascade: true })
   outcomes!: Outcome[];

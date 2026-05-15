@@ -29,6 +29,7 @@ export class SettlementQueueService implements OnModuleInit, OnModuleDestroy {
 
   async addSettlementJob(tradeId: string): Promise<void> {
     const opts: JobsOptions = {
+      jobId: `trade-${tradeId}`,
       attempts: 3,
       backoff: {
         type: 'exponential',

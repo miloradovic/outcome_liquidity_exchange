@@ -257,6 +257,31 @@ describe('Full Order Flow (e2e)', () => {
       expect(walletRes.availableBalanceCents).toBe(4_000);
       expect(walletRes.reservedBalanceCents).toBe(0);
     });
+
+    it('market resolution credits the winning side collateral payout', async () => {
+      const resolveRes = await request(app.getHttpServer())
+        .post(`/api/markets/${marketId}/resolve`)
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .send({ winningSide: OutcomeSide.YES })
+        .expect(200);
+
+      expect(resolveRes.body.status).toBe(MarketStatus.RESOLVED);
+      expect(resolveRes.body.resolvedOutcome).toBe(OutcomeSide.YES);
+
+      const aliceWallet = await request(app.getHttpServer())
+        .get('/api/wallet')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .expect(200);
+      expect(aliceWallet.body.availableBalanceCents).toBe(14_000);
+      expect(aliceWallet.body.reservedBalanceCents).toBe(0);
+
+      const bobWallet = await request(app.getHttpServer())
+        .get('/api/wallet')
+        .set('Authorization', `Bearer ${accessTokenBob}`)
+        .expect(200);
+      expect(bobWallet.body.availableBalanceCents).toBe(6_000);
+      expect(bobWallet.body.reservedBalanceCents).toBe(0);
+    });
   });
 
   describe('auth and permissions', () => {

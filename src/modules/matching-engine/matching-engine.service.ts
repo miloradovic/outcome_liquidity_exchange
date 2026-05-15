@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  OnApplicationBootstrap,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { OutcomeSide } from '../markets/enums/outcome-side.enum';
 import { OrderStatus } from '../markets/enums/order-status.enum';
 import { TradeStatus } from '../markets/enums/trade-status.enum';
 import { RealtimeService } from '../realtime/realtime.service';
+import { WalletService } from '../wallet/wallet.service';
 
 export type OrderBookLevel = {
   priceCents: number;
@@ -29,7 +31,7 @@ export type OrderBookView = {
 };
 
 @Injectable()
-export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
+export class MatchingEngineService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(MatchingEngineService.name);
   private redis!: Redis;
 
@@ -38,6 +40,7 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly dataSource: DataSource,
     private readonly settlementQueueService: SettlementQueueService,
     private readonly realtimeService: RealtimeService,
+    private readonly walletService: WalletService,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(Trade)
@@ -50,8 +53,12 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
       port: this.configService.get<number>('REDIS_PORT', 6379),
       maxRetriesPerRequest: null,
     });
+  }
 
+  async onApplicationBootstrap(): Promise<void> {
     await this.rebuildFromOpenOrders();
+    await this.recoverOrphanMatchPendingOrders();
+    await this.recoverPendingSettlementTrades();
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -186,20 +193,147 @@ export class MatchingEngineService implements OnModuleInit, OnModuleDestroy {
       const message = error instanceof Error ? error.message : 'unknown error';
       this.logger.error(`Failed to enqueue settlement for trade ${matched.trade.id}: ${message}`);
 
-      await this.dataSource.transaction(async (manager) => {
-        const tradeRepo = manager.getRepository(Trade);
-        const orderRepo = manager.getRepository(Order);
+      try {
+        await this.failPendingTradeAndReleaseFunds(matched.trade.id);
+      } catch (rollbackError) {
+        const rollbackMessage = rollbackError instanceof Error
+          ? rollbackError.message
+          : 'unknown error';
+        this.logger.error(
+          `Failed to rollback trade ${matched.trade.id} after queue enqueue failure: ${rollbackMessage}`,
+        );
+      }
+    }
+  }
 
-        await tradeRepo.update({ id: matched.trade.id }, { status: TradeStatus.FAILED });
-        await orderRepo.update(
-          { id: matched.order.id },
-          { status: OrderStatus.SETTLEMENT_FAILED },
+  private async recoverPendingSettlementTrades(): Promise<void> {
+    const pendingTrades = await this.tradeRepository.find({
+      where: { status: TradeStatus.PENDING_SETTLEMENT },
+      select: ['id'],
+    });
+
+    if (pendingTrades.length === 0) {
+      return;
+    }
+
+    let enqueuedCount = 0;
+    for (const trade of pendingTrades) {
+      try {
+        await this.settlementQueueService.addSettlementJob(trade.id);
+        enqueuedCount += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+        this.logger.error(
+          `Failed to re-enqueue pending settlement trade ${trade.id}: ${message}`,
         );
-        await orderRepo.update(
-          { id: matched.counterparty.id },
-          { status: OrderStatus.SETTLEMENT_FAILED },
-        );
+      }
+    }
+
+    this.logger.log(
+      `Pending settlement recovery finished: total=${pendingTrades.length}, enqueued=${enqueuedCount}`,
+    );
+  }
+
+  private async recoverOrphanMatchPendingOrders(): Promise<void> {
+    const orphanOrders = await this.orderRepository
+      .createQueryBuilder('o')
+      .leftJoin(Trade, 'yes_trade', 'yes_trade.yes_order_id = o.id')
+      .leftJoin(Trade, 'no_trade', 'no_trade.no_order_id = o.id')
+      .where('o.status = :status', { status: OrderStatus.MATCH_PENDING })
+      .andWhere('yes_trade.id IS NULL')
+      .andWhere('no_trade.id IS NULL')
+      .getMany();
+
+    if (orphanOrders.length === 0) {
+      return;
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      for (const order of orphanOrders) {
+        order.status = OrderStatus.OPEN;
+      }
+
+      await orderRepo.save(orphanOrders);
+    });
+
+    for (const order of orphanOrders) {
+      await this.projectOpenOrder(order);
+    }
+
+    this.logger.warn(
+      `Recovered orphan MATCH_PENDING orders at startup: count=${orphanOrders.length}`,
+    );
+  }
+
+  private async failPendingTradeAndReleaseFunds(tradeId: string): Promise<void> {
+    const userIds = await this.dataSource.transaction(async (manager) => {
+      const tradeRepo = manager.getRepository(Trade);
+      const orderRepo = manager.getRepository(Order);
+
+      const trade = await tradeRepo.findOne({
+        where: { id: tradeId },
+        lock: { mode: 'pessimistic_write' },
       });
+      if (!trade || trade.status !== TradeStatus.PENDING_SETTLEMENT) {
+        return [] as string[];
+      }
+
+      const yesOrder = await orderRepo.findOne({
+        where: { id: trade.yesOrderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const noOrder = await orderRepo.findOne({
+        where: { id: trade.noOrderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!yesOrder || !noOrder) {
+        throw new Error(`Related orders missing for pending trade ${trade.id}`);
+      }
+
+      await this.walletService.release(
+        yesOrder.userId,
+        yesOrder.reservedCents,
+        `trade:${trade.id}:release:${yesOrder.id}`,
+        yesOrder.id,
+        manager,
+      );
+      await this.walletService.release(
+        noOrder.userId,
+        noOrder.reservedCents,
+        `trade:${trade.id}:release:${noOrder.id}`,
+        noOrder.id,
+        manager,
+      );
+
+      yesOrder.status = OrderStatus.SETTLEMENT_FAILED;
+      noOrder.status = OrderStatus.SETTLEMENT_FAILED;
+      trade.status = TradeStatus.FAILED;
+
+      await orderRepo.save([yesOrder, noOrder]);
+      await tradeRepo.save(trade);
+
+      return [yesOrder.userId, noOrder.userId];
+    });
+
+    await this.broadcastBalanceUpdates(userIds);
+  }
+
+  private async broadcastBalanceUpdates(userIds: string[]): Promise<void> {
+    for (const userId of new Set(userIds)) {
+      try {
+        const wallet = await this.walletService.getWalletByUserId(userId);
+        this.realtimeService.broadcastBalanceUpdate(userId, {
+          availableBalanceCents: wallet.availableBalanceCents,
+          reservedBalanceCents: wallet.reservedBalanceCents,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `Failed to broadcast balance update for user ${userId}: ${message}`,
+        );
+      }
     }
   }
 
