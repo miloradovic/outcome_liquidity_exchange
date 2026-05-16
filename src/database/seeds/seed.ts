@@ -15,7 +15,7 @@ import { MarketStatus } from '../../modules/markets/enums/market-status.enum';
 import { OutcomeSide } from '../../modules/markets/enums/outcome-side.enum';
 import { Wallet } from '../../modules/wallet/entities/wallet.entity';
 
-const DEMO_PASSWORD = 'DemoPassword123!';
+const DEMO_PASSWORD = 'demo only';
 const BCRYPT_ROUNDS = 10;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -65,14 +65,28 @@ async function seed(): Promise<void> {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
   for (const demo of DEMO_USERS) {
-    let user = await userRepo.findOne({ where: { email: demo.email } });
+    let user = await userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email: demo.email })
+      .getOne();
     if (!user) {
       user = await userRepo.save(
         userRepo.create({ email: demo.email, username: demo.username, passwordHash }),
       );
       console.log(`  CREATED  ${demo.email}`);
     } else {
-      console.log(`  SKIP  ${demo.email} (already exists)`);
+      const hasDemoPassword = await bcrypt.compare(DEMO_PASSWORD, user.passwordHash);
+      const hasExpectedUsername = user.username === demo.username;
+
+      if (!hasDemoPassword || !hasExpectedUsername) {
+        user.passwordHash = passwordHash;
+        user.username = demo.username;
+        await userRepo.save(user);
+        console.log(`  UPDATED  ${demo.email} (password/username synced)`);
+      } else {
+        console.log(`  SKIP  ${demo.email} (already up to date)`);
+      }
     }
 
     const wallet = await walletRepo.findOne({ where: { userId: user.id } });

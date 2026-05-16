@@ -33,6 +33,14 @@ export default function MarketDetailPage(): ReactElement {
     token,
   });
 
+  const statusLabel = marketQuery.data
+    ? `${marketQuery.data.status}${
+        marketQuery.data.status === 'RESOLVED' && marketQuery.data.resolvedOutcome
+          ? ` - ${marketQuery.data.resolvedOutcome} wins`
+          : ''
+      }`
+    : null;
+
   return (
     <main className="mx-auto min-h-[calc(100vh-60px)] w-full max-w-6xl px-6 py-10">
       {marketQuery.isLoading ? <p className="text-sm text-tide">Loading market...</p> : null}
@@ -47,7 +55,7 @@ export default function MarketDetailPage(): ReactElement {
         <>
           <h1 className="text-3xl font-black text-ink">{marketQuery.data.title}</h1>
           <p className="mt-1 text-sm text-tide">
-            {marketQuery.data.status} - /{marketQuery.data.slug}
+            {statusLabel} - /{marketQuery.data.slug}
           </p>
         </>
       ) : null}

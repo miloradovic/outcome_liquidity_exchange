@@ -6,10 +6,6 @@ export default function HomePage(): ReactElement {
     <main className="min-h-screen bg-foam px-6 py-20 text-ink">
       <div className="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr]">
         <section className="flex flex-col gap-7">
-          <p className="inline-flex w-fit rounded-full bg-mint/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-tide">
-            Week 5 Demo UI
-          </p>
-
           <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
             Outcome Liquidity Exchange
           </h1>

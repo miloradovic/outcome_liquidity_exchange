@@ -54,22 +54,23 @@ services:
     container_name: outcome_exchange_web
     environment:
       NODE_ENV: development
+      CI: "true"
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
       NEXT_PUBLIC_WS_BASE_URL: ${NEXT_PUBLIC_WS_BASE_URL:-http://localhost:3000}
     ports:
       - "3001:3000"
     command: >
       sh -lc "
-      pnpm --dir /usr/src/app install --frozen-lockfile --filter ./apps/web...;
-      pnpm run dev --hostname 0.0.0.0 --port 3000
+      pnpm --dir /usr/src/app/apps/web install --frozen-lockfile --config.confirmModulesPurge=false &&
+      pnpm --dir /usr/src/app/apps/web run dev --hostname 0.0.0.0 --port 3000
       "
     depends_on:
       app:
         condition: service_healthy
     volumes:
       - .:/usr/src/app
-      - web_root_node_modules:/usr/src/app/node_modules
-      - web_app_node_modules:/usr/src/app/apps/web/node_modules
+      - ./node_modules:/usr/src/app/node_modules
+      - ./apps/web/node_modules:/usr/src/app/apps/web/node_modules
       - web_next_cache:/usr/src/app/apps/web/.next
     restart: unless-stopped
 
@@ -111,9 +112,5 @@ volumes:
   redis_data:
   app_node_modules:
     name: olx_app_node_modules
-  web_root_node_modules:
-    name: olx_web_root_node_modules
-  web_app_node_modules:
-    name: olx_web_app_node_modules
   web_next_cache:
     name: olx_web_next_cache

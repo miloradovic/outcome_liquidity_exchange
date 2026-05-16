@@ -67,6 +67,7 @@ export type Market = {
   title: string;
   status: MarketStatus;
   closesAt: string | null;
+  resolvedOutcome: OutcomeSide | null;
   outcomes: Outcome[];
   createdAt: string;
 };

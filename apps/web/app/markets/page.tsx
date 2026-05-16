@@ -37,7 +37,12 @@ export default function MarketsPage(): ReactElement {
         <ul className="mt-6 grid gap-4 md:grid-cols-2">
           {marketsQuery.data.map((market) => (
             <li key={market.id} className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-tide">{market.status}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-tide">
+                {market.status}
+                {market.status === 'RESOLVED' && market.resolvedOutcome
+                  ? ` - ${market.resolvedOutcome}`
+                  : ''}
+              </p>
               <h2 className="mt-2 text-xl font-bold text-ink">{market.title}</h2>
               <p className="mt-1 text-xs text-tide/80">/{market.slug}</p>
 

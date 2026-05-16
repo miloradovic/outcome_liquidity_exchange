@@ -29,7 +29,7 @@ Stop everything:
 docker compose down
 ```
 
-## Week 5 Demo Flow
+## Demo Flow
 
 1. Register or login from the web app.
 2. Open Wallet and deposit demo funds.
