@@ -61,7 +61,7 @@ services:
       - "3001:3000"
     command: >
       sh -lc "
-      pnpm --dir /usr/src/app/apps/web install --frozen-lockfile --config.confirmModulesPurge=false &&
+      pnpm --dir /usr/src/app install --frozen-lockfile --config.confirmModulesPurge=false &&
       pnpm --dir /usr/src/app/apps/web run dev --hostname 0.0.0.0 --port 3000
       "
     depends_on:
@@ -69,8 +69,8 @@ services:
         condition: service_healthy
     volumes:
       - .:/usr/src/app
-      - ./node_modules:/usr/src/app/node_modules
-      - ./apps/web/node_modules:/usr/src/app/apps/web/node_modules
+      - web_root_node_modules:/usr/src/app/node_modules
+      - web_app_node_modules:/usr/src/app/apps/web/node_modules
       - web_next_cache:/usr/src/app/apps/web/.next
     restart: unless-stopped
 
@@ -112,5 +112,9 @@ volumes:
   redis_data:
   app_node_modules:
     name: olx_app_node_modules
+  web_root_node_modules:
+    name: olx_web_root_node_modules
+  web_app_node_modules:
+    name: olx_web_app_node_modules
   web_next_cache:
     name: olx_web_next_cache
