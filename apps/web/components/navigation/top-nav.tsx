@@ -19,6 +19,11 @@ export function TopNav(): ReactElement {
             <Link href="/markets" className="hover:text-mint">
               Markets
             </Link>
+            {isHydrated && isAuthenticated && user?.role === 'ADMIN' ? (
+              <Link href="/markets?view=operator" className="hover:text-mint">
+                Operator View
+              </Link>
+            ) : null}
             <Link href="/wallet" className="hover:text-mint">
               Wallet
             </Link>
@@ -31,6 +36,11 @@ export function TopNav(): ReactElement {
         <div className="flex items-center gap-2 text-sm">
           {isHydrated && isAuthenticated ? (
             <>
+              {user?.role === 'ADMIN' ? (
+                <span className="rounded-full border border-mint/50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-mint">
+                  Operator
+                </span>
+              ) : null}
               <span className="hidden text-foam/75 sm:inline">{user?.email}</span>
               <button
                 type="button"

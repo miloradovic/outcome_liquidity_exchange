@@ -1,19 +1,25 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import type { ReactElement } from 'react';
+import { useState } from 'react';
 import { OrderBookPanel } from './_components/order-book-panel';
 import { OrderTicket } from './_components/order-ticket';
 import { useOrderBookRealtime } from './_hooks/use-order-book-realtime';
 
 import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient } from '@/lib/api-client';
+import type { OutcomeSide } from '@/lib/types';
+
+type PendingAdminAction = 'close' | 'resolve' | null;
 
 export default function MarketDetailPage(): ReactElement {
   const params = useParams<{ marketId: string }>();
   const marketId = params.marketId;
-  const { token, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const { token, isAuthenticated, user } = useAuth();
+  const [pendingAdminAction, setPendingAdminAction] = useState<PendingAdminAction>(null);
 
   const marketQuery = useQuery({
     queryKey: ['market', marketId],
@@ -32,6 +38,50 @@ export default function MarketDetailPage(): ReactElement {
     marketId,
     token,
   });
+
+  const closeMarketMutation = useMutation({
+    mutationFn: () => apiClient.closeMarket(token!, marketId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['market', marketId] }),
+        queryClient.invalidateQueries({ queryKey: ['markets'] }),
+      ]);
+    },
+  });
+
+  const resolveMarketMutation = useMutation({
+    mutationFn: (winningSide: OutcomeSide) => apiClient.resolveMarket(token!, marketId, winningSide),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['market', marketId] }),
+        queryClient.invalidateQueries({ queryKey: ['markets'] }),
+      ]);
+    },
+  });
+
+  const isAdmin = user?.role === 'ADMIN';
+  const isAdminActionBusy = closeMarketMutation.isPending || resolveMarketMutation.isPending;
+  const adminActionError = closeMarketMutation.error ?? resolveMarketMutation.error;
+  const adminActionErrorMessage =
+    adminActionError instanceof Error ? adminActionError.message : null;
+
+  const onConfirmCloseMarket = (): void => {
+    if (isAdminActionBusy) {
+      return;
+    }
+
+    setPendingAdminAction(null);
+    closeMarketMutation.mutate();
+  };
+
+  const onResolveSelection = (winningSide: OutcomeSide): void => {
+    if (isAdminActionBusy) {
+      return;
+    }
+
+    setPendingAdminAction(null);
+    resolveMarketMutation.mutate(winningSide);
+  };
 
   const statusLabel = marketQuery.data
     ? `${marketQuery.data.status}${
@@ -57,6 +107,117 @@ export default function MarketDetailPage(): ReactElement {
           <p className="mt-1 text-sm text-tide">
             {statusLabel} - /{marketQuery.data.slug}
           </p>
+
+          {isAdmin && token ? (
+            <section className="mt-4 rounded-xl border border-ink/10 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-tide">Operator controls</p>
+              <p className="mt-1 text-sm text-tide">Manage this market lifecycle from the UI.</p>
+
+              {marketQuery.data.status === 'OPEN' ? (
+                <div className="mt-3">
+                  {pendingAdminAction === 'close' ? (
+                    <div className="rounded-md border border-ink/15 bg-foam p-3">
+                      <p className="text-sm text-ink">
+                        Close this market for new trading?
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={onConfirmCloseMarket}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md bg-ink px-3 py-2 text-sm font-semibold text-foam disabled:opacity-60"
+                        >
+                          {closeMarketMutation.isPending ? 'Closing...' : 'Yes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingAdminAction(null)}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md border border-ink/25 px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                        >
+                          No
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingAdminAction(null)}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md border border-ink/25 px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPendingAdminAction('close')}
+                      disabled={isAdminActionBusy}
+                      className="rounded-md bg-ink px-3 py-2 text-sm font-semibold text-foam disabled:opacity-60"
+                    >
+                      Close market
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              {marketQuery.data.status === 'CLOSED' ? (
+                <div className="mt-3">
+                  {pendingAdminAction === 'resolve' ? (
+                    <div className="rounded-md border border-ink/15 bg-foam p-3">
+                      <p className="text-sm text-ink">Choose winning side:</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onResolveSelection('YES')}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md bg-mint px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                        >
+                          {resolveMarketMutation.isPending ? 'Resolving...' : 'Yes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onResolveSelection('NO')}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md border border-ink/20 px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                        >
+                          {resolveMarketMutation.isPending ? 'Resolving...' : 'No'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingAdminAction(null)}
+                          disabled={isAdminActionBusy}
+                          className="rounded-md border border-ink/20 px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPendingAdminAction('resolve')}
+                      disabled={isAdminActionBusy}
+                      className="rounded-md bg-mint px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                    >
+                      Resolve market
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              {marketQuery.data.status === 'RESOLVED' ? (
+                <p className="mt-3 text-sm text-tide">
+                  Market already resolved{marketQuery.data.resolvedOutcome ? `: ${marketQuery.data.resolvedOutcome}` : ''}.
+                </p>
+              ) : null}
+
+              {adminActionErrorMessage ? (
+                <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {adminActionErrorMessage}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
         </>
       ) : null}
 

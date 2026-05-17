@@ -50,6 +50,10 @@ type PlaceOrderPayload = {
   idempotencyKey: string;
 };
 
+type ResolveMarketPayload = {
+  winningSide: OutcomeSide;
+};
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -223,6 +227,29 @@ export const apiClient = {
 
   getOrderBook(marketId: string): Promise<OrderBookView> {
     return apiRequest<OrderBookView>(`/markets/${marketId}/order-book`);
+  },
+
+  closeMarket(token: string, marketId: string): Promise<Market> {
+    return apiRequest<Market>(`/markets/${marketId}/close`, {
+      method: 'POST',
+      token,
+    });
+  },
+
+  resolveMarket(
+    token: string,
+    marketId: string,
+    winningSide: OutcomeSide,
+  ): Promise<Market> {
+    const payload: ResolveMarketPayload = {
+      winningSide,
+    };
+
+    return apiRequest<Market>(`/markets/${marketId}/resolve`, {
+      method: 'POST',
+      token,
+      body: payload,
+    });
   },
 
   placeOrder(token: string, payload: PlaceOrderPayload): Promise<Order> {

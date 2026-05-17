@@ -2,15 +2,34 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import type { ReactElement } from 'react';
+import { useMemo } from 'react';
 
+import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient } from '@/lib/api-client';
 
 export default function MarketsPage(): ReactElement {
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
   const marketsQuery = useQuery({
     queryKey: ['markets'],
     queryFn: () => apiClient.getMarkets(),
   });
+
+  const isOperatorView = searchParams.get('view') === 'operator' && user?.role === 'ADMIN';
+
+  const visibleMarkets = useMemo(() => {
+    if (!marketsQuery.data) {
+      return [];
+    }
+
+    if (!isOperatorView) {
+      return marketsQuery.data;
+    }
+
+    return marketsQuery.data.filter((market) => market.status === 'OPEN' || market.status === 'CLOSED');
+  }, [isOperatorView, marketsQuery.data]);
 
   return (
     <main className="mx-auto min-h-[calc(100vh-60px)] w-full max-w-6xl px-6 py-10">
@@ -18,6 +37,15 @@ export default function MarketsPage(): ReactElement {
         <div>
           <h1 className="text-3xl font-black text-ink">Markets</h1>
           <p className="mt-1 text-sm text-tide">Binary YES/NO markets from the existing API.</p>
+          {isOperatorView ? (
+            <p className="mt-2 text-sm text-tide">
+              Operator view active: showing OPEN and CLOSED markets only.
+              {' '}
+              <Link href="/markets" className="font-semibold text-ink hover:text-tide">
+                Show all
+              </Link>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -29,13 +57,13 @@ export default function MarketsPage(): ReactElement {
         </p>
       ) : null}
 
-      {!marketsQuery.isLoading && marketsQuery.data && marketsQuery.data.length === 0 ? (
+      {!marketsQuery.isLoading && !marketsQuery.isError && visibleMarkets.length === 0 ? (
         <p className="mt-6 text-sm text-tide">No markets available.</p>
       ) : null}
 
-      {!marketsQuery.isLoading && marketsQuery.data && marketsQuery.data.length > 0 ? (
+      {!marketsQuery.isLoading && !marketsQuery.isError && visibleMarkets.length > 0 ? (
         <ul className="mt-6 grid gap-4 md:grid-cols-2">
-          {marketsQuery.data.map((market) => (
+          {visibleMarkets.map((market) => (
             <li key={market.id} className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-tide">
                 {market.status}
