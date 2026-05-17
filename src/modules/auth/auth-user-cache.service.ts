@@ -7,12 +7,14 @@ import { ConfigService } from '@nestjs/config';
 import { RedisClientService } from '../redis/redis-client.service';
 import { RedisKeyspaceService } from '../redis/redis-keyspace.service';
 import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
 
 type CachedAuthUser = {
   id: string;
   email: string;
   username: string;
+  role: UserRole;
   createdAt: string;
   updatedAt: string;
 };
@@ -62,6 +64,7 @@ export class AuthUserCacheService {
         !parsed.id
         || !parsed.email
         || !parsed.username
+        || !parsed.role
         || !parsed.createdAt
         || !parsed.updatedAt
       ) {
@@ -81,6 +84,7 @@ export class AuthUserCacheService {
       id: user.id,
       email: user.email,
       username: user.username,
+      role: user.role,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
@@ -103,6 +107,7 @@ export class AuthUserCacheService {
     user.id = cached.id;
     user.email = cached.email;
     user.username = cached.username;
+    user.role = cached.role;
     user.createdAt = new Date(cached.createdAt);
     user.updatedAt = new Date(cached.updatedAt);
 

@@ -8,6 +8,7 @@ import { AuthTokenRevocationService } from './auth-token-revocation.service';
 import { UsersRegistrationService } from '../users/users-registration.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -21,6 +22,7 @@ const mockUser: User = {
   email: 'alice@demo.com',
   passwordHash: 'hashed-password',
   username: 'alice',
+  role: UserRole.USER,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
   normalizeEmail: jest.fn(),

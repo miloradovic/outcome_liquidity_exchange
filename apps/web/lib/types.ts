@@ -16,10 +16,13 @@ export type WalletEntryType =
   | 'SETTLE_DEBIT'
   | 'SETTLE_CREDIT';
 
+export type UserRole = 'USER' | 'ADMIN';
+
 export type UserProfile = {
   id: string;
   email: string;
   username: string;
+  role: UserRole;
   createdAt: string;
   updatedAt: string;
 };

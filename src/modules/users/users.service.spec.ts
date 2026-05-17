@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
+import { UserRole } from './enums/user-role.enum';
 
 const mockUser: User = {
   id: 'user-uuid-1',
   email: 'alice@demo.com',
   passwordHash: '$2b$10$hashed',
   username: 'alice',
+  role: UserRole.USER,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };

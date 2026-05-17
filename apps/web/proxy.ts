@@ -8,7 +8,7 @@ function isProtectedPath(pathname: string): boolean {
   return pathname === '/wallet' || pathname.startsWith('/wallet/') || pathname === '/orders' || pathname.startsWith('/orders/');
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   if (!isProtectedPath(pathname)) {
     return NextResponse.next();

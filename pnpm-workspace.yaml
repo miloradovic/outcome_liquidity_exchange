@@ -7,4 +7,5 @@ onlyBuiltDependencies:
   - '@scarf/scarf'
   - bcrypt
   - msgpackr-extract
+  - sharp
   - unrs-resolver

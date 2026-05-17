@@ -7,17 +7,15 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminOnly } from '../auth/decorators/admin-only.decorator';
 import { OrderBookProjectionService } from '../matching-engine/order-book-projection.service';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { ResolveMarketDto } from './dto/resolve-market.dto';
@@ -66,8 +64,7 @@ export class MarketsController {
 
   @Post(':marketId/resolve')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @AdminOnly()
   @ApiOperation({ summary: 'Resolve a market and credit winning positions' })
   @ApiParam({ name: 'marketId', description: 'Market UUID' })
   @ApiResponse({

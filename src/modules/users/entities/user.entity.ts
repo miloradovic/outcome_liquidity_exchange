@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class User {
@@ -23,6 +24,9 @@ export class User {
 
   @Column({ unique: true, length: 100 })
   username!: string;
+
+  @Column({ type: 'varchar', length: 20, default: UserRole.USER })
+  role!: UserRole;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

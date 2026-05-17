@@ -9,10 +9,13 @@ import { Market } from '../src/modules/markets/entities/market.entity';
 import { Outcome } from '../src/modules/markets/entities/outcome.entity';
 import { MarketStatus } from '../src/modules/markets/enums/market-status.enum';
 import { OutcomeSide } from '../src/modules/markets/enums/outcome-side.enum';
+import { User } from '../src/modules/users/entities/user.entity';
+import { UserRole } from '../src/modules/users/enums/user-role.enum';
 import { waitFor } from './helpers/polling';
 
 describe('Full Order Flow (e2e)', () => {
   let app: INestApplication;
+  let dataSource: DataSource;
   let marketId: string;
   let accessTokenAlice: string;
   let accessTokenBob: string;
@@ -52,7 +55,7 @@ describe('Full Order Flow (e2e)', () => {
     accessTokenBob = bobRes.body.accessToken as string;
 
     // Create a market for this test suite — do not rely on seed data
-    const dataSource = app.get(DataSource);
+    dataSource = app.get(DataSource);
     const market = await dataSource.getRepository(Market).save(
       dataSource.getRepository(Market).create({
         slug: `full-flow-${Date.now()}`,
@@ -236,10 +239,33 @@ describe('Full Order Flow (e2e)', () => {
       expect(walletRes.reservedBalanceCents).toBe(0);
     });
 
-    it('market resolution credits the winning side collateral payout', async () => {
-      const resolveRes = await request(app.getHttpServer())
+    it('market resolution requires admin and credits the winning side collateral payout', async () => {
+      await request(app.getHttpServer())
         .post(`/api/markets/${marketId}/resolve`)
         .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .send({ winningSide: OutcomeSide.YES })
+        .expect(403);
+
+      const adminRegisterRes = await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          email: `admin-e2e-${Date.now()}@demo.com`,
+          password: 'Password123!',
+          username: `admin${Date.now()}`,
+        })
+        .expect(201);
+
+      const adminUserId = adminRegisterRes.body.user.id as string;
+      const accessTokenAdmin = adminRegisterRes.body.accessToken as string;
+
+      await dataSource.getRepository(User).update(
+        { id: adminUserId },
+        { role: UserRole.ADMIN },
+      );
+
+      const resolveRes = await request(app.getHttpServer())
+        .post(`/api/markets/${marketId}/resolve`)
+        .set('Authorization', `Bearer ${accessTokenAdmin}`)
         .send({ winningSide: OutcomeSide.YES })
         .expect(200);
 

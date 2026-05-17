@@ -19,7 +19,7 @@ const BCRYPT_ROUNDS = 10;
 const UNIQUE_VIOLATION_CODE = '23505';
 type AuthUserProfile = Pick<
   User,
-  'id' | 'email' | 'username' | 'createdAt' | 'updatedAt'
+  'id' | 'email' | 'username' | 'role' | 'createdAt' | 'updatedAt'
 >;
 
 @Injectable()

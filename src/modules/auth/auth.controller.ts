@@ -27,7 +27,7 @@ import type { Request } from 'express';
 
 type CurrentUserProfile = Pick<
   User,
-  'id' | 'email' | 'username' | 'createdAt' | 'updatedAt'
+  'id' | 'email' | 'username' | 'role' | 'createdAt' | 'updatedAt'
 >;
 
 @ApiTags('auth')

@@ -7,12 +7,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
 
 const mockUser: User = {
   id: 'user-uuid-1',
   email: 'alice@demo.com',
   passwordHash: 'hashed-password',
   username: 'alice',
+  role: UserRole.USER,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
   normalizeEmail: jest.fn(),
@@ -24,6 +26,7 @@ const mockAuthResponse = {
     id: mockUser.id,
     email: mockUser.email,
     username: mockUser.username,
+    role: mockUser.role,
     createdAt: mockUser.createdAt,
     updatedAt: mockUser.updatedAt,
   },
