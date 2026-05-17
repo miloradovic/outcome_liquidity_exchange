@@ -63,7 +63,17 @@ export class SettlementWorkerService implements OnModuleInit, OnModuleDestroy {
           lock: { mode: 'pessimistic_write' },
         });
 
-        if (!trade || trade.status !== TradeStatus.PENDING_SETTLEMENT) {
+        if (!trade) {
+          return [] as string[];
+        }
+
+        if (trade.status === TradeStatus.FAILED) {
+          throw new Error(
+            `Trade ${tradeId} is marked as failed and requires manual recovery`,
+          );
+        }
+
+        if (trade.status !== TradeStatus.PENDING_SETTLEMENT) {
           return [] as string[];
         }
 
