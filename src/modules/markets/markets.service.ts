@@ -10,6 +10,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { DEFAULT_PAGINATION, PaginationParams } from '../../common/pagination/pagination';
 import { WalletService } from '../wallet/wallet.service';
 import { MarketAccessService } from './market-access.service';
+import { CreateMarketDto } from './dto/create-market.dto';
 import { Market } from './entities/market.entity';
 import { Outcome } from './entities/outcome.entity';
 import { Order } from './entities/order.entity';
@@ -42,6 +43,80 @@ export class MarketsService {
 
   async getMarketById(marketId: string): Promise<Market> {
     return this.marketAccessService.getMarketByIdOrFail(marketId);
+  }
+
+  async createMarket(dto: CreateMarketDto): Promise<Market> {
+    const closesAt = new Date(dto.closesAt);
+    if (Number.isNaN(closesAt.getTime())) {
+      throw new BadRequestException('Invalid closesAt value');
+    }
+    if (closesAt.getTime() <= Date.now()) {
+      throw new BadRequestException('closesAt must be in the future');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const marketRepo = manager.getRepository(Market);
+      const outcomeRepo = manager.getRepository(Outcome);
+
+      const market = marketRepo.create({
+        slug: dto.slug,
+        title: dto.title,
+        status: MarketStatus.OPEN,
+        closesAt,
+      });
+      const savedMarket = await marketRepo.save(market);
+
+      const outcomes = await outcomeRepo.save([
+        outcomeRepo.create({ market: savedMarket, side: OutcomeSide.YES }),
+        outcomeRepo.create({ market: savedMarket, side: OutcomeSide.NO }),
+      ]);
+      savedMarket.outcomes = outcomes;
+
+      return savedMarket;
+    });
+  }
+
+  async closeMarket(marketId: string): Promise<Market> {
+    return this.dataSource.transaction(async (manager) => {
+      const marketRepo = manager.getRepository(Market);
+
+      const market = await marketRepo.findOne({
+        where: { id: marketId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      if (market.status === MarketStatus.RESOLVED) {
+        throw new BadRequestException('Resolved market cannot be closed');
+      }
+
+      if (market.status === MarketStatus.CLOSED) {
+        return market;
+      }
+
+      market.status = MarketStatus.CLOSED;
+      const now = new Date();
+      if (!market.closesAt || market.closesAt.getTime() > now.getTime()) {
+        market.closesAt = now;
+      }
+
+      return marketRepo.save(market);
+    });
+  }
+
+  async closeExpiredMarkets(now: Date = new Date()): Promise<number> {
+    const result = await this.marketRepository
+      .createQueryBuilder()
+      .update(Market)
+      .set({ status: MarketStatus.CLOSED })
+      .where('status = :openStatus', { openStatus: MarketStatus.OPEN })
+      .andWhere('closes_at IS NOT NULL')
+      .andWhere('closes_at <= :now', { now: now.toISOString() })
+      .execute();
+
+    return result.affected ?? 0;
   }
 
   async resolveMarket(marketId: string, winningSide: OutcomeSide): Promise<Market> {

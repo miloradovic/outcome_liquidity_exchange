@@ -46,6 +46,10 @@ export class MarketAccessService {
       throw new BadRequestException('Market is not open');
     }
 
+    if (market.closesAt && market.closesAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Market is closed');
+    }
+
     return market;
   }
 }

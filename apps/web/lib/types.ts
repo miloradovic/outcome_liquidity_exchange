@@ -7,7 +7,7 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'SETTLEMENT_FAILED';
 
-export type MarketStatus = 'OPEN' | 'RESOLVED';
+export type MarketStatus = 'OPEN' | 'CLOSED' | 'RESOLVED';
 
 export type WalletEntryType =
   | 'DEPOSIT'

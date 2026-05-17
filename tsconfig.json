@@ -16,7 +16,7 @@
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
-    "types": ["jest", "node"]
+    "types": []
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
