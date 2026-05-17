@@ -176,7 +176,6 @@ export class SettlementQueueService implements OnModuleInit, OnModuleDestroy {
       state === 'waiting'
       || state === 'active'
       || state === 'delayed'
-      || state === 'paused'
       || state === 'prioritized'
       || state === 'waiting-children'
     );

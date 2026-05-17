@@ -29,14 +29,26 @@ Stop everything:
 docker compose down
 ```
 
-## Demo Flow
+## Operator + Demo Flow
 
-1. Register or login from the web app.
-2. Open Wallet and deposit demo funds.
-3. Browse Markets and open a market detail page.
-4. Place an order from the order ticket.
-5. Open a second browser session, place the complementary order, and watch live order-book and balance updates.
-6. Cancel an unmatched open order from My Orders.
+1. Register two trader accounts from the web app.
+2. Use the development-seeded operator account:
+  - email: `operator@demo.com`
+  - password: `demo only`
+3. Deposit funds for both traders from Wallet.
+4. Place complementary YES/NO orders so they match and settle.
+5. Resolve the market as operator (`POST /api/markets/:marketId/resolve`).
+6. Verify winning wallet balance updates, then withdraw from Wallet.
+7. Restart API and web to validate projection and session continuity:
+
+```bash
+docker compose restart app web
+```
+
+8. As operator, inspect and retry settlement recovery endpoints when needed:
+  - `GET /api/jobs/settlements?status=failed`
+  - `POST /api/jobs/settlements/retry/trades/:tradeId`
+  - `POST /api/jobs/settlements/retry/jobs/:jobId`
 
 ## Architecture Overview
 
@@ -86,16 +98,27 @@ src/modules/
 - `GET /api/wallet` - Get wallet balance (available + reserved)
 - `GET /api/wallet/entries?limit=100&offset=0` - Get transaction history (paginated)
 - `POST /api/wallet/deposit` - Deposit demo funds
+- `POST /api/wallet/withdraw` - Withdraw available funds (idempotent)
 
 ### Markets (Public)
 - `GET /api/markets?limit=100&offset=0` - List markets (paginated)
 - `GET /api/markets/:marketId` - Get market details and outcomes
 - `GET /api/markets/:marketId/order-book` - Get live order book
 
+### Markets (Admin)
+- `POST /api/markets` - Create market
+- `POST /api/markets/:marketId/close` - Close market for new trading
+- `POST /api/markets/:marketId/resolve` - Resolve market and credit winners
+
 ### Orders (Protected)
 - `POST /api/orders` - Place a new order
 - `DELETE /api/orders/:orderId` - Cancel an open order
 - `GET /api/orders/me?limit=100&offset=0` - Get current user's orders (paginated)
+
+### Jobs (Admin)
+- `GET /api/jobs/settlements?status=pending|failed&limit=100&offset=0` - Inspect settlement queue state
+- `POST /api/jobs/settlements/retry/trades/:tradeId` - Retry settlement by trade
+- `POST /api/jobs/settlements/retry/jobs/:jobId` - Retry settlement by queue job id
 
 ### Realtime Updates (WebSocket)
 - **Public**: `ws://localhost:3000/order-book`
@@ -206,7 +229,14 @@ Tests core business logic: wallet math, matching rules, idempotency, etc.
 ```bash
 npm run test:e2e
 ```
-Tests full flows: register → deposit → place → match → settle
+Tests full flows: register -> deposit -> place -> match -> settle -> resolve -> withdraw
+
+Focused finish-line checks:
+
+```bash
+docker compose exec app pnpm run test:e2e -- full-flow.e2e-spec.ts
+docker compose exec app pnpm run test:e2e -- jobs-settlement-recovery.e2e-spec.ts
+```
 
 ### Web Build
 ```bash
@@ -223,7 +253,11 @@ Key scenarios covered:
 - Register and deposit flow
 - Place order, view order book
 - Order matching and balance updates
+- Market resolution and winner payout
+- Withdraw and withdraw idempotency
 - Order cancellation and fund release
+- Projection recovery after restart
+- Settlement queue inspection and retry recovery
 - Idempotency under duplicate requests
 - Authentication and authorization
 
@@ -238,6 +272,7 @@ docker compose exec app pnpm run test:e2e
 # Web checks (inside web container)
 docker compose exec web pnpm run lint
 docker compose exec web pnpm run test
+docker compose exec web pnpm run typecheck
 docker compose exec web sh -lc "NODE_ENV=production pnpm run build"
 ```
 

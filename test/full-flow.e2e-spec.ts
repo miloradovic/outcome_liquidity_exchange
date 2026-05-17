@@ -19,6 +19,7 @@ describe('Full Order Flow (e2e)', () => {
   let marketId: string;
   let accessTokenAlice: string;
   let accessTokenBob: string;
+  let accessTokenAdmin: string;
 
   const aliceUser = {
     email: `alice-e2e-${Date.now()}@demo.com`,
@@ -32,7 +33,7 @@ describe('Full Order Flow (e2e)', () => {
     username: `bob${Date.now()}`,
   };
 
-  beforeAll(async () => {
+  async function bootstrapApp(): Promise<void> {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -40,6 +41,29 @@ describe('Full Order Flow (e2e)', () => {
     app = moduleFixture.createNestApplication();
     configureApp(app);
     await app.init();
+    dataSource = app.get(DataSource);
+  }
+
+  async function createMarketWithOutcomes(slug: string, title: string): Promise<string> {
+    const market = await dataSource.getRepository(Market).save(
+      dataSource.getRepository(Market).create({
+        slug,
+        title,
+        status: MarketStatus.OPEN,
+        closesAt: null,
+      }),
+    );
+
+    await dataSource.getRepository(Outcome).save([
+      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.YES }),
+      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.NO }),
+    ]);
+
+    return market.id;
+  }
+
+  beforeAll(async () => {
+    await bootstrapApp();
 
     // Register and get tokens
     const aliceRes = await request(app.getHttpServer())
@@ -54,21 +78,26 @@ describe('Full Order Flow (e2e)', () => {
       .expect(201);
     accessTokenBob = bobRes.body.accessToken as string;
 
-    // Create a market for this test suite — do not rely on seed data
-    dataSource = app.get(DataSource);
-    const market = await dataSource.getRepository(Market).save(
-      dataSource.getRepository(Market).create({
-        slug: `full-flow-${Date.now()}`,
-        title: 'Full Flow E2E Market',
-        status: MarketStatus.OPEN,
-        closesAt: null,
-      }),
+    const adminRes = await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: `admin-e2e-${Date.now()}@demo.com`,
+        password: 'Password123!',
+        username: `admin${Date.now()}`,
+      })
+      .expect(201);
+    accessTokenAdmin = adminRes.body.accessToken as string;
+
+    await dataSource.getRepository(User).update(
+      { id: adminRes.body.user.id as string },
+      { role: UserRole.ADMIN },
     );
-    marketId = market.id;
-    await dataSource.getRepository(Outcome).save([
-      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.YES }),
-      dataSource.getRepository(Outcome).create({ market, side: OutcomeSide.NO }),
-    ]);
+
+    // Create a market for this test suite — do not rely on seed data
+    marketId = await createMarketWithOutcomes(
+      `full-flow-${Date.now()}`,
+      'Full Flow E2E Market',
+    );
   });
 
   afterAll(async () => {
@@ -246,23 +275,6 @@ describe('Full Order Flow (e2e)', () => {
         .send({ winningSide: OutcomeSide.YES })
         .expect(403);
 
-      const adminRegisterRes = await request(app.getHttpServer())
-        .post('/api/auth/register')
-        .send({
-          email: `admin-e2e-${Date.now()}@demo.com`,
-          password: 'Password123!',
-          username: `admin${Date.now()}`,
-        })
-        .expect(201);
-
-      const adminUserId = adminRegisterRes.body.user.id as string;
-      const accessTokenAdmin = adminRegisterRes.body.accessToken as string;
-
-      await dataSource.getRepository(User).update(
-        { id: adminUserId },
-        { role: UserRole.ADMIN },
-      );
-
       const resolveRes = await request(app.getHttpServer())
         .post(`/api/markets/${marketId}/resolve`)
         .set('Authorization', `Bearer ${accessTokenAdmin}`)
@@ -285,6 +297,103 @@ describe('Full Order Flow (e2e)', () => {
         .expect(200);
       expect(bobWallet.body.availableBalanceCents).toBe(6_000);
       expect(bobWallet.body.reservedBalanceCents).toBe(0);
+    });
+  });
+
+  describe('withdraw and restart recovery flow', () => {
+    it('alice can withdraw idempotently after settlement', async () => {
+      const idempotencyKey = `alice-withdraw-${Date.now()}`;
+
+      const firstWithdrawRes = await request(app.getHttpServer())
+        .post('/api/wallet/withdraw')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .send({ amountCents: 2_500, idempotencyKey })
+        .expect(201);
+      expect(firstWithdrawRes.body.wallet.availableBalanceCents).toBe(11_500);
+      expect(firstWithdrawRes.body.wallet.reservedBalanceCents).toBe(0);
+
+      const replayWithdrawRes = await request(app.getHttpServer())
+        .post('/api/wallet/withdraw')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .send({ amountCents: 2_500, idempotencyKey })
+        .expect(201);
+      expect(replayWithdrawRes.body.wallet.availableBalanceCents).toBe(11_500);
+      expect(replayWithdrawRes.body.wallet.reservedBalanceCents).toBe(0);
+
+      const entriesRes = await request(app.getHttpServer())
+        .get('/api/wallet/entries')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .expect(200);
+
+      const withdrawEntries = (
+        entriesRes.body as Array<{ entryType: string; idempotencyKey: string }>
+      ).filter(
+        (entry) => entry.entryType === 'WITHDRAW' && entry.idempotencyKey === idempotencyKey,
+      );
+
+      expect(withdrawEntries).toHaveLength(1);
+    });
+
+    it('restores open order-book projection after app restart', async () => {
+      const restartMarketId = await createMarketWithOutcomes(
+        `restart-recovery-${Date.now()}`,
+        'Restart Recovery E2E Market',
+      );
+
+      const placeRes = await request(app.getHttpServer())
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .send({
+          marketId: restartMarketId,
+          side: OutcomeSide.YES,
+          priceCents: 50,
+          quantity: 10,
+          idempotencyKey: `restart-order-${Date.now()}`,
+        })
+        .expect(201);
+      const openOrderId = placeRes.body.id as string;
+
+      const beforeRestartBook = await request(app.getHttpServer())
+        .get(`/api/markets/${restartMarketId}/order-book`)
+        .expect(200);
+      const beforeRestartLevel = beforeRestartBook.body.yes.find(
+        (level: { priceCents: number; quantity: number }) => level.priceCents === 50,
+      );
+      expect(beforeRestartLevel).toBeDefined();
+      expect(beforeRestartLevel?.quantity).toBeGreaterThanOrEqual(10);
+
+      await app.close();
+      await bootstrapApp();
+
+      await waitFor(
+        async () => {
+          const response = await request(app.getHttpServer())
+            .get(`/api/markets/${restartMarketId}/order-book`)
+            .expect(200);
+
+          return response.body as {
+            yes: Array<{ priceCents: number; quantity: number }>;
+          };
+        },
+        (orderBook) => {
+          const yesLevel = orderBook.yes.find((level) => level.priceCents === 50);
+          expect(yesLevel).toBeDefined();
+          expect(yesLevel?.quantity).toBeGreaterThanOrEqual(10);
+        },
+        { attempts: 40, delayMs: 150 },
+      );
+
+      await request(app.getHttpServer())
+        .delete(`/api/orders/${openOrderId}`)
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .expect(200);
+
+      const aliceWallet = await request(app.getHttpServer())
+        .get('/api/wallet')
+        .set('Authorization', `Bearer ${accessTokenAlice}`)
+        .expect(200);
+      expect(aliceWallet.body.availableBalanceCents).toBe(11_500);
+      expect(aliceWallet.body.reservedBalanceCents).toBe(0);
     });
   });
 

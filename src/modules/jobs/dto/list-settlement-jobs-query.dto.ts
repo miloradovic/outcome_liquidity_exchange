@@ -2,7 +2,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
 
 import { PaginationQueryDto } from '../../../common/pagination/pagination-query.dto';
-import { SettlementQueueFilter } from '../settlement-queue.service';
 
 export enum SettlementJobsStatus {
   FAILED = 'failed',
@@ -17,5 +16,5 @@ export class ListSettlementJobsQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsEnum(SettlementJobsStatus)
-  status: SettlementQueueFilter = SettlementJobsStatus.FAILED;
+  status: SettlementJobsStatus = SettlementJobsStatus.FAILED;
 }

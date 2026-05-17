@@ -16,7 +16,10 @@ import {
 
 import { AdminOnly } from '../auth/decorators/admin-only.decorator';
 import { ListSettlementJobsQueryDto } from './dto/list-settlement-jobs-query.dto';
-import { SettlementQueueService } from './settlement-queue.service';
+import {
+  SettlementQueueService,
+  type SettlementQueueFilter,
+} from './settlement-queue.service';
 import { SettlementRecoveryService } from './settlement-recovery.service';
 
 @ApiTags('jobs')
@@ -36,7 +39,7 @@ export class JobsController {
   })
   async listSettlementJobs(@Query() query: ListSettlementJobsQueryDto) {
     return this.settlementQueueService.listSettlementJobs(
-      query.status,
+      query.status as SettlementQueueFilter,
       query.limit,
       query.offset,
     );

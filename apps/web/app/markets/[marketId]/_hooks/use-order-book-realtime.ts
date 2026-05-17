@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  attachReconnectRecovery,
   createOrderBookSocket,
   type OrderBookUpdateMessage,
   type TradeCreatedMessage,
@@ -42,6 +43,16 @@ export function useOrderBookRealtime({
     setLastRealtimeAt(null);
 
     const socket = createOrderBookSocket();
+    const detachRecovery = attachReconnectRecovery(socket, async () => {
+      setRealtimeError('Realtime connection restored. Syncing latest market state...');
+      await queryClient.invalidateQueries({ queryKey: ['order-book', marketId] });
+
+      if (token) {
+        await queryClient.invalidateQueries({ queryKey: ['orders', token] });
+      }
+
+      setRealtimeError(null);
+    });
 
     const subscribeToMarket = (): void => {
       setIsConnected(true);
@@ -105,6 +116,7 @@ export function useOrderBookRealtime({
     }
 
     return () => {
+      detachRecovery();
       socket.emit('unsubscribe', { marketId });
       socket.off('connect', subscribeToMarket);
       socket.off('disconnect', handleDisconnect);

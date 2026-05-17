@@ -9,6 +9,7 @@ import 'reflect-metadata';
 import * as bcrypt from 'bcrypt';
 import { AppDataSource } from '../data-source';
 import { User } from '../../modules/users/entities/user.entity';
+import { UserRole } from '../../modules/users/enums/user-role.enum';
 import { Market } from '../../modules/markets/entities/market.entity';
 import { Outcome } from '../../modules/markets/entities/outcome.entity';
 import { MarketStatus } from '../../modules/markets/enums/market-status.enum';
@@ -18,15 +19,41 @@ import { Wallet } from '../../modules/wallet/entities/wallet.entity';
 const DEMO_PASSWORD = 'demo only';
 const BCRYPT_ROUNDS = 10;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const DEVELOPMENT_APP_ENV = 'development';
+
+type DemoUserSeed = {
+  email: string;
+  username: string;
+  role?: UserRole;
+};
 
 function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * DAY_IN_MS);
 }
 
-const DEMO_USERS = [
+const BASE_DEMO_USERS: DemoUserSeed[] = [
   { email: 'alice@demo.com', username: 'alice' },
   { email: 'bob@demo.com', username: 'bob' },
 ];
+
+function resolveAppEnv(): string {
+  return (process.env.APP_ENV ?? '').trim().toLowerCase();
+}
+
+function getDemoUsers(appEnv: string): DemoUserSeed[] {
+  if (appEnv !== DEVELOPMENT_APP_ENV) {
+    return BASE_DEMO_USERS;
+  }
+
+  return [
+    ...BASE_DEMO_USERS,
+    {
+      email: 'operator@demo.com',
+      username: 'operator',
+      role: UserRole.ADMIN,
+    },
+  ];
+}
 
 const DEMO_MARKETS: Array<{
   slug: string;
@@ -51,6 +78,9 @@ const DEMO_MARKETS: Array<{
 ];
 
 async function seed(): Promise<void> {
+  const appEnv = resolveAppEnv();
+  const demoUsers = getDemoUsers(appEnv);
+
   console.log('Connecting to database...');
   await AppDataSource.initialize();
   console.log('Connected.');
@@ -62,9 +92,16 @@ async function seed(): Promise<void> {
 
   // Seed demo users
   console.log('\n--- Seeding demo users ---');
+  if (appEnv === DEVELOPMENT_APP_ENV) {
+    console.log('  APP_ENV=development detected, seeding operator@demo.com as ADMIN');
+  } else {
+    console.log(
+      `  APP_ENV=${process.env.APP_ENV ?? '(unset)'}; skipping development-only operator admin seed`,
+    );
+  }
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
-  for (const demo of DEMO_USERS) {
+  for (const demo of demoUsers) {
     let user = await userRepo
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
@@ -72,18 +109,27 @@ async function seed(): Promise<void> {
       .getOne();
     if (!user) {
       user = await userRepo.save(
-        userRepo.create({ email: demo.email, username: demo.username, passwordHash }),
+        userRepo.create({
+          email: demo.email,
+          username: demo.username,
+          passwordHash,
+          role: demo.role ?? UserRole.USER,
+        }),
       );
       console.log(`  CREATED  ${demo.email}`);
     } else {
       const hasDemoPassword = await bcrypt.compare(DEMO_PASSWORD, user.passwordHash);
       const hasExpectedUsername = user.username === demo.username;
+      const hasExpectedRole = demo.role === undefined || user.role === demo.role;
 
-      if (!hasDemoPassword || !hasExpectedUsername) {
+      if (!hasDemoPassword || !hasExpectedUsername || !hasExpectedRole) {
         user.passwordHash = passwordHash;
         user.username = demo.username;
+        if (demo.role !== undefined) {
+          user.role = demo.role;
+        }
         await userRepo.save(user);
-        console.log(`  UPDATED  ${demo.email} (password/username synced)`);
+        console.log(`  UPDATED  ${demo.email} (seed profile synced)`);
       } else {
         console.log(`  SKIP  ${demo.email} (already up to date)`);
       }

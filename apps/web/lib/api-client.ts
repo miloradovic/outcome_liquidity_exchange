@@ -60,6 +60,38 @@ export class ApiError extends Error {
   }
 }
 
+function fallbackMessageForStatus(status: number): string {
+  if (status === 400 || status === 422) {
+    return 'Request was rejected. Review the form values and try again.';
+  }
+
+  if (status === 401) {
+    return 'Your session expired. Sign in again and retry.';
+  }
+
+  if (status === 403) {
+    return 'You do not have permission for this action.';
+  }
+
+  if (status === 404) {
+    return 'The requested resource was not found.';
+  }
+
+  if (status === 409) {
+    return 'This request conflicts with existing data. Refresh and retry.';
+  }
+
+  if (status === 429) {
+    return 'Too many requests. Please wait a moment and try again.';
+  }
+
+  if (status >= 500) {
+    return 'Server error. Please try again shortly.';
+  }
+
+  return 'Request failed.';
+}
+
 function toMessage(payload: ApiErrorPayload | undefined, fallback: string): string {
   if (!payload) {
     return fallback;
@@ -100,10 +132,13 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError('Request timed out. Please try again.', 408);
+      throw new ApiError('Request timed out. Please retry.', 408);
     }
 
-    throw new ApiError('Network request failed', 0);
+    throw new ApiError(
+      'Network request failed. Check that the API service is running and reachable.',
+      0,
+    );
   } finally {
     clearTimeout(timeoutId);
   }
@@ -116,7 +151,10 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
       payload = undefined;
     }
 
-    throw new ApiError(toMessage(payload, 'Request failed'), response.status);
+    throw new ApiError(
+      toMessage(payload, fallbackMessageForStatus(response.status)),
+      response.status,
+    );
   }
 
   if (response.status === 204) {

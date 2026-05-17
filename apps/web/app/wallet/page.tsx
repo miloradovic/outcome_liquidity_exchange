@@ -12,7 +12,11 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient } from '@/lib/api-client';
 import { createIdempotencyKey } from '@/lib/idempotency';
 import { dollarsToCents, formatCents } from '@/lib/money';
-import { createBalanceSocket, type BalanceUpdateMessage } from '@/lib/realtime';
+import {
+  attachReconnectRecovery,
+  createBalanceSocket,
+  type BalanceUpdateMessage,
+} from '@/lib/realtime';
 import type { Wallet } from '@/lib/types';
 
 const walletAmountSchema = z.object({
@@ -53,6 +57,14 @@ function WalletContent(): ReactElement {
     }
 
     const socket = createBalanceSocket();
+    const detachRecovery = attachReconnectRecovery(socket, async () => {
+      setRealtimeError('Balance stream restored. Syncing latest wallet state...');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['wallet', token] }),
+        queryClient.invalidateQueries({ queryKey: ['wallet-entries', token] }),
+      ]);
+      setRealtimeError(null);
+    });
 
     const authenticate = () => {
       setIsRealtimeConnected(true);
@@ -109,6 +121,7 @@ function WalletContent(): ReactElement {
     }
 
     return () => {
+      detachRecovery();
       socket.off('connect', authenticate);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleConnectError);
