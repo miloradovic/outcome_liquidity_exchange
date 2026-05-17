@@ -87,6 +87,30 @@ export class WalletService {
     return mutation.wallet;
   }
 
+  async withdraw(
+    userId: string,
+    amountCents: number,
+    idempotencyKey: string,
+    manager?: EntityManager,
+  ): Promise<Wallet> {
+    const mutation = await this.mutateWallet({
+      userId,
+      amountCents,
+      idempotencyKey,
+      entryType: WalletEntryType.WITHDRAW,
+      referenceType: WalletReferenceType.MANUAL_WITHDRAW,
+      referenceId: idempotencyKey,
+      apply: (wallet, amount) => {
+        if (wallet.availableBalanceCents < amount) {
+          throw new BadRequestException('Insufficient available balance');
+        }
+        wallet.availableBalanceCents -= amount;
+      },
+      manager,
+    });
+    return mutation.wallet;
+  }
+
   async reserve(
     userId: string,
     amountCents: number,

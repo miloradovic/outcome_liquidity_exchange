@@ -1,5 +1,6 @@
 export enum WalletEntryType {
   DEPOSIT = 'DEPOSIT',
+  WITHDRAW = 'WITHDRAW',
   RESERVE = 'RESERVE',
   RELEASE = 'RELEASE',
   SETTLE_DEBIT = 'SETTLE_DEBIT',

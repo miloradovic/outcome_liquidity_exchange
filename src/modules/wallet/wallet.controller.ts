@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { User } from '../users/entities/user.entity';
 import { DepositDto } from './dto/deposit.dto';
+import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
 
 @ApiTags('wallet')
@@ -58,6 +59,25 @@ export class WalletController {
   })
   async deposit(@CurrentUser() user: User, @Body() dto: DepositDto) {
     const wallet = await this.walletService.deposit(
+      user.id,
+      dto.amountCents,
+      dto.idempotencyKey,
+    );
+    return {
+      wallet,
+      amountCents: dto.amountCents,
+      idempotencyKey: dto.idempotencyKey,
+    };
+  }
+
+  @Post('withdraw')
+  @ApiOperation({ summary: 'Withdraw available funds' })
+  @ApiResponse({
+    status: 201,
+    description: 'Funds withdrawn successfully',
+  })
+  async withdraw(@CurrentUser() user: User, @Body() dto: WithdrawDto) {
+    const wallet = await this.walletService.withdraw(
       user.id,
       dto.amountCents,
       dto.idempotencyKey,

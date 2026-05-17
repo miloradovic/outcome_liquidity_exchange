@@ -76,4 +76,52 @@ describe('Wallet (e2e)', () => {
     expect(entriesRes.body.length).toBe(1);
     expect(entriesRes.body[0].entryType).toBe('DEPOSIT');
   });
+
+  it('withdraws funds idempotently and records one withdraw ledger entry', async () => {
+    const idempotencyKey = `wallet-withdraw-${Date.now()}`;
+
+    await request(app.getHttpServer())
+      .post('/api/wallet/withdraw')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amountCents: 500, idempotencyKey })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/wallet/withdraw')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amountCents: 500, idempotencyKey })
+      .expect(201);
+
+    const walletRes = await request(app.getHttpServer())
+      .get('/api/wallet')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(walletRes.body.availableBalanceCents).toBe(1_000);
+    expect(walletRes.body.reservedBalanceCents).toBe(0);
+
+    const entriesRes = await request(app.getHttpServer())
+      .get('/api/wallet/entries')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    const withdrawEntries = (entriesRes.body as Array<{ entryType: string }>).filter(
+      (entry) => entry.entryType === 'WITHDRAW',
+    );
+    expect(withdrawEntries).toHaveLength(1);
+  });
+
+  it('rejects withdraw that exceeds available balance', async () => {
+    const idempotencyKey = `wallet-withdraw-overspend-${Date.now()}`;
+
+    await request(app.getHttpServer())
+      .post('/api/wallet/withdraw')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amountCents: 5_000, idempotencyKey })
+      .expect(400);
+
+    const walletRes = await request(app.getHttpServer())
+      .get('/api/wallet')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(walletRes.body.availableBalanceCents).toBe(1_000);
+  });
 });

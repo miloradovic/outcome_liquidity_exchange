@@ -11,6 +11,7 @@ export type MarketStatus = 'OPEN' | 'RESOLVED';
 
 export type WalletEntryType =
   | 'DEPOSIT'
+  | 'WITHDRAW'
   | 'RESERVE'
   | 'RELEASE'
   | 'SETTLE_DEBIT'
@@ -54,6 +55,12 @@ export type WalletEntry = {
 };
 
 export type DepositResponse = {
+  wallet: Wallet;
+  amountCents: number;
+  idempotencyKey: string;
+};
+
+export type WithdrawResponse = {
   wallet: Wallet;
   amountCents: number;
   idempotencyKey: string;

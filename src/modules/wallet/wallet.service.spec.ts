@@ -124,6 +124,17 @@ describe('WalletService', () => {
     expect(wallet.reservedBalanceCents).toBe(0);
   });
 
+  it('withdraws funds and blocks overdraft', async () => {
+    const wallet = await service.withdraw('user-1', 250, 'wd-000001');
+
+    expect(wallet.availableBalanceCents).toBe(750);
+    expect(wallet.reservedBalanceCents).toBe(0);
+
+    await expect(service.withdraw('user-1', 2_000, 'wd-000002')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
   it('reserves funds and blocks overspending', async () => {
     const reserved = await service.reserve('user-1', 300, 'res-000001', 'order-1');
     expect(reserved.availableBalanceCents).toBe(700);
@@ -194,6 +205,38 @@ describe('WalletService', () => {
     });
 
     const wallet = await service.deposit('user-1', 100, 'dup-000001');
+    expect(wallet.availableBalanceCents).toBe(1_000);
+  });
+
+  it('replays withdraw idempotency key without applying mutation twice', async () => {
+    dataSource.transaction.mockImplementationOnce(async (cb: (manager: unknown) => unknown) => {
+      const txWalletRepo = {
+        findOne: jest.fn(async () => txWalletState),
+        save: jest.fn(async (wallet: Wallet) => ({ ...wallet })),
+      };
+      const txEntryRepo = {
+        findOne: jest.fn(async () => ({
+          id: 'entry-2',
+          walletId: 'wallet-1',
+          idempotencyKey: 'dup-wd-000001',
+        })),
+        create: jest.fn(),
+        save: jest.fn(),
+      };
+
+      const manager = {
+        getRepository: (entity: unknown) => {
+          if (entity === Wallet) {
+            return txWalletRepo;
+          }
+          return txEntryRepo;
+        },
+      };
+
+      return cb(manager);
+    });
+
+    const wallet = await service.withdraw('user-1', 100, 'dup-wd-000001');
     expect(wallet.availableBalanceCents).toBe(1_000);
   });
 

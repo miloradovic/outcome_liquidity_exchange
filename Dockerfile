@@ -7,7 +7,7 @@ RUN npm install -g pnpm@10.22.0 --no-audit --no-fund
 FROM base AS development
 ENV NODE_ENV=development
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --filter .
 
@@ -24,7 +24,7 @@ RUN pnpm run build
 FROM base AS production
 ENV NODE_ENV=production
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --prod --frozen-lockfile --filter .
 
@@ -36,7 +36,7 @@ CMD ["node", "dist/main.js"]
 FROM base AS web-development
 ENV NODE_ENV=development
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --filter ./apps/web...
 
@@ -49,7 +49,7 @@ CMD ["pnpm", "run", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 FROM base AS web-builder
 ENV NODE_ENV=production
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --filter ./apps/web...
 

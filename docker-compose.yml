@@ -27,7 +27,9 @@ services:
       - "3000:3000"
     command: >
       sh -lc "
-      pnpm install --frozen-lockfile --filter .;
+      (pnpm install --frozen-lockfile --filter . --config.confirmModulesPurge=false ||
+      pnpm install --frozen-lockfile --filter . --config.confirmModulesPurge=false ||
+      pnpm install --frozen-lockfile --filter . --config.confirmModulesPurge=false) &&
       pnpm run start:dev
       "
     volumes:
@@ -61,7 +63,9 @@ services:
       - "3001:3000"
     command: >
       sh -lc "
-      pnpm --dir /usr/src/app install --frozen-lockfile --config.confirmModulesPurge=false &&
+      (pnpm --dir /usr/src/app install --frozen-lockfile --config.confirmModulesPurge=false ||
+      pnpm --dir /usr/src/app install --frozen-lockfile --config.confirmModulesPurge=false ||
+      pnpm --dir /usr/src/app install --frozen-lockfile --config.confirmModulesPurge=false) &&
       pnpm --dir /usr/src/app/apps/web run dev --hostname 0.0.0.0 --port 3000
       "
     depends_on:

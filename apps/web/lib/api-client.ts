@@ -10,6 +10,7 @@ import type {
   UserProfile,
   Wallet,
   WalletEntry,
+  WithdrawResponse,
 } from './types';
 
 type RequestOptions = {
@@ -32,6 +33,11 @@ type LoginPayload = {
 };
 
 type DepositPayload = {
+  amountCents: number;
+  idempotencyKey: string;
+};
+
+type WithdrawPayload = {
   amountCents: number;
   idempotencyKey: string;
 };
@@ -155,6 +161,14 @@ export const apiClient = {
 
   deposit(token: string, payload: DepositPayload): Promise<DepositResponse> {
     return apiRequest<DepositResponse>('/wallet/deposit', {
+      method: 'POST',
+      token,
+      body: payload,
+    });
+  },
+
+  withdraw(token: string, payload: WithdrawPayload): Promise<WithdrawResponse> {
+    return apiRequest<WithdrawResponse>('/wallet/withdraw', {
       method: 'POST',
       token,
       body: payload,

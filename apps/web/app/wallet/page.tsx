@@ -15,7 +15,7 @@ import { dollarsToCents, formatCents } from '@/lib/money';
 import { createBalanceSocket, type BalanceUpdateMessage } from '@/lib/realtime';
 import type { Wallet } from '@/lib/types';
 
-const depositSchema = z.object({
+const walletAmountSchema = z.object({
   amountUsd: z
     .string()
     .trim()
@@ -23,12 +23,13 @@ const depositSchema = z.object({
     .refine((value) => dollarsToCents(value) > 0, 'Enter a valid positive amount'),
 });
 
-type DepositFormValues = z.infer<typeof depositSchema>;
+type WalletAmountFormValues = z.infer<typeof walletAmountSchema>;
 
 function WalletContent(): ReactElement {
   const queryClient = useQueryClient();
   const { token, user } = useAuth();
   const [depositError, setDepositError] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -118,19 +119,31 @@ function WalletContent(): ReactElement {
   }, [queryClient, token, user]);
 
   const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<DepositFormValues>({
-    resolver: zodResolver(depositSchema),
+    register: registerDeposit,
+    handleSubmit: handleSubmitDeposit,
+    reset: resetDeposit,
+    formState: { errors: depositErrors, isSubmitting: isDepositSubmitting },
+  } = useForm<WalletAmountFormValues>({
+    resolver: zodResolver(walletAmountSchema),
     defaultValues: {
       amountUsd: '1000.00',
     },
   });
 
+  const {
+    register: registerWithdraw,
+    handleSubmit: handleSubmitWithdraw,
+    reset: resetWithdraw,
+    formState: { errors: withdrawFormErrors, isSubmitting: isWithdrawSubmitting },
+  } = useForm<WalletAmountFormValues>({
+    resolver: zodResolver(walletAmountSchema),
+    defaultValues: {
+      amountUsd: '100.00',
+    },
+  });
+
   const depositMutation = useMutation({
-    mutationFn: async (values: DepositFormValues) => {
+    mutationFn: async (values: WalletAmountFormValues) => {
       const amountCents = dollarsToCents(values.amountUsd);
       if (amountCents <= 0) {
         throw new Error('Invalid amount');
@@ -146,17 +159,48 @@ function WalletContent(): ReactElement {
         queryClient.invalidateQueries({ queryKey: ['wallet', token] }),
         queryClient.invalidateQueries({ queryKey: ['wallet-entries', token] }),
       ]);
-      reset({ amountUsd: '1000.00' });
+      resetDeposit({ amountUsd: '1000.00' });
     },
   });
 
-  const onDeposit = handleSubmit(async (values) => {
+  const withdrawMutation = useMutation({
+    mutationFn: async (values: WalletAmountFormValues) => {
+      const amountCents = dollarsToCents(values.amountUsd);
+      if (amountCents <= 0) {
+        throw new Error('Invalid amount');
+      }
+
+      return apiClient.withdraw(token!, {
+        amountCents,
+        idempotencyKey: createIdempotencyKey('withdraw'),
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['wallet', token] }),
+        queryClient.invalidateQueries({ queryKey: ['wallet-entries', token] }),
+      ]);
+      resetWithdraw({ amountUsd: '100.00' });
+    },
+  });
+
+  const onDeposit = handleSubmitDeposit(async (values) => {
     setDepositError(null);
     try {
       await depositMutation.mutateAsync(values);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Deposit failed';
       setDepositError(message);
+    }
+  });
+
+  const onWithdraw = handleSubmitWithdraw(async (values) => {
+    setWithdrawError(null);
+    try {
+      await withdrawMutation.mutateAsync(values);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Withdraw failed';
+      setWithdrawError(message);
     }
   });
 
@@ -218,37 +262,76 @@ function WalletContent(): ReactElement {
       </section>
 
       <section className="mt-8 grid gap-6 lg:grid-cols-[340px_1fr]">
-        <div className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-ink">Deposit Demo Funds</h2>
-          <p className="mt-1 text-sm text-tide">Amount in USD. Backend records cents and idempotency key.</p>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-ink">Deposit Demo Funds</h2>
+            <p className="mt-1 text-sm text-tide">Amount in USD. Backend records cents and idempotency key.</p>
 
-          <form onSubmit={onDeposit} className="mt-4 space-y-3">
-            <label className="block text-sm font-semibold text-tide">
-              Amount (USD)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                {...register('amountUsd')}
-                className="mt-1 w-full rounded-md border border-ink/20 px-3 py-2 outline-none focus:border-mint"
-              />
-              {errors.amountUsd ? (
-                <span className="mt-1 block text-xs text-red-600">{errors.amountUsd.message}</span>
+            <form onSubmit={onDeposit} className="mt-4 space-y-3">
+              <label className="block text-sm font-semibold text-tide">
+                Amount (USD)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  {...registerDeposit('amountUsd')}
+                  className="mt-1 w-full rounded-md border border-ink/20 px-3 py-2 outline-none focus:border-mint"
+                />
+                {depositErrors.amountUsd ? (
+                  <span className="mt-1 block text-xs text-red-600">{depositErrors.amountUsd.message}</span>
+                ) : null}
+              </label>
+
+              {depositError ? (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{depositError}</p>
               ) : null}
-            </label>
 
-            {depositError ? (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{depositError}</p>
-            ) : null}
+              <button
+                type="submit"
+                disabled={isDepositSubmitting || depositMutation.isPending}
+                className="w-full rounded-md bg-ink px-4 py-2.5 text-sm font-bold text-foam disabled:opacity-60"
+              >
+                {isDepositSubmitting || depositMutation.isPending ? 'Depositing...' : 'Deposit'}
+              </button>
+            </form>
+          </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting || depositMutation.isPending}
-              className="w-full rounded-md bg-ink px-4 py-2.5 text-sm font-bold text-foam disabled:opacity-60"
-            >
-              {isSubmitting || depositMutation.isPending ? 'Depositing...' : 'Deposit'}
-            </button>
-          </form>
+          <div className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-ink">Withdraw Funds</h2>
+            <p className="mt-1 text-sm text-tide">
+              Withdraw from available balance. Requests are idempotent server-side.
+            </p>
+
+            <form onSubmit={onWithdraw} className="mt-4 space-y-3">
+              <label className="block text-sm font-semibold text-tide">
+                Amount (USD)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  {...registerWithdraw('amountUsd')}
+                  className="mt-1 w-full rounded-md border border-ink/20 px-3 py-2 outline-none focus:border-mint"
+                />
+                {withdrawFormErrors.amountUsd ? (
+                  <span className="mt-1 block text-xs text-red-600">
+                    {withdrawFormErrors.amountUsd.message}
+                  </span>
+                ) : null}
+              </label>
+
+              {withdrawError ? (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{withdrawError}</p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isWithdrawSubmitting || withdrawMutation.isPending}
+                className="w-full rounded-md bg-ink px-4 py-2.5 text-sm font-bold text-foam disabled:opacity-60"
+              >
+                {isWithdrawSubmitting || withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw'}
+              </button>
+            </form>
+          </div>
         </div>
 
         <div className="rounded-xl border border-ink/10 bg-white p-5 shadow-sm">
